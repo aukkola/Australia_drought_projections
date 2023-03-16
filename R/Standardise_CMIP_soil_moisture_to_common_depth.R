@@ -16,14 +16,10 @@ in_interval <- function(x, interval){
 ### Set paths ###
 #################
 
-
 path <- "/g/data/w97/amu561/CABLE_AWRA_comparison/"
 
-datasets <- c("CMIP6", "CMIP5")
 
 
-for (d in datasets) {
-  
   in_path <- 
   
   
@@ -31,11 +27,6 @@ for (d in datasets) {
   
   
   
-  
-  
-}
-
-
 
 
 experiment <- "historical"

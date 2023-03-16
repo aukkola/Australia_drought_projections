@@ -66,7 +66,7 @@ dataset="cmip6"
 #Clef search with options for models, experiments, variables etc.
 search_criteria="--local $dataset --experiment historical --experiment ssp245 \
                  --experiment ssp585 --experiment ssp126 --experiment ssp370 \
-	       	 --experiment ssp460 --variable mrsol \ 
+	       	       --experiment ssp460 --variable mrsol \ 
                  --table Emon"
 
 
@@ -365,14 +365,7 @@ do
             
             #Set start and end year 
             year_start=`echo ${years[0]}`
-            year_end=`echo ${years[${#years[@]} - 1]}`
-            
-            # #Select years
-            # cdo selyear,$year_start/$year_end $in_file $out_file
-            # 
-            # infile=
-            # 
-            
+            year_end=`echo ${years[${#years[@]} - 1]}`        
               
 
               ###--- Air temperature ---###
@@ -538,27 +531,30 @@ do
               #script to fix these (provided by Arden)
               python fix_lon.py "${outfile_regrid}"
 
-  		        #Remove temp file if cropping
-  		        #rm $outfile_temp
-
               
+							#Python returns a file by this name:
+							outfile_python=${out_file%".nc"}"_regrid_setgrid.nc"
+
+              #Use this to crop Australia
+              outfile_aus=${out_file%".nc"}"_Aus.nc"
+              cdo sellonlatbox,111.975,154.025,-44.025,-9.975 $outfile_python $outfile_aus
+
 
   			      #Remove non-regridded file and merged time file
-  			      rm $out_file
-
-
+  			      rm $out_file $outfile_python         
+          
 
               ###########################################
               ###--- Data quality and error checks ---###
               ###########################################
 
               #Sanity check, does output file exist?
-              files_existing=`ls $processed_path/*setgrid.nc`
+              files_existing=`ls $outfile_aus`
 
               #Check if empty string. If so, cat to file
               if [ -z "$files_existing" ]; then
 
-                 echo $processed_path >> failed_files_${dataset}.txt
+                 echo $outfile_aus >> failed_files_${dataset}.txt
 
               fi
 
@@ -566,12 +562,9 @@ do
               #Calculate and save variable global mean. Use to check that variables are not corrupted
               check_dir="${OUT_DIR}/Data_checks/${E}/${var_short}/Global_mean/${M}/"
               mkdir -p $check_dir
+            
               
-              #The python script (fix_lon.py) resaves the file with a different name (setgrid*)
-              #Use this when calculating global mean
-              outfile_setgrid=${out_file%".nc"}"_regrid_setgrid.nc"
-              
-  			      cdo fldmean $outfile_setgrid ${check_dir}/${M}_global_mean_${var_short}.nc
+  			      cdo fldmean $outfile_aus ${check_dir}/${M}_${ens}_global_mean_${var_short}.nc
 
 
               
@@ -594,7 +587,7 @@ do
               ### Map of mean of all time slices ###
               
               files_regrid <- list.files(path="${OUT_DIR}/${E}/${var_short}/${M}/", recursive=TRUE, 
-                                         pattern="setgrid.nc", full.names=TRUE)    #regridded
+                                         pattern="_Aus.nc", full.names=TRUE)    #regridded
                                          
               data_regrid <- lapply(files_regrid, brick, stopIfNotEqualSpaced=FALSE)
 
@@ -613,7 +606,7 @@ do
           		### Global mean time series ###
               
           		files_mean <- list.files(path="${check_dir}", recursive=TRUE, 
-                                       pattern="${M}_global_mean", full.names=TRUE)
+                                       pattern="${M}_${ens}_global_mean", full.names=TRUE)
 
           		nc_handles <- lapply(files_mean, nc_open)
           		nc_data    <- lapply(nc_handles, ncvar_get, varid="${var_short}")

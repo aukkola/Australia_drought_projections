@@ -8,7 +8,7 @@
 #PBS -q normal
 #PBS -l wd
 #PBS -l jobfs=1GB
-#PBS -l storage=gdata/w97+gdata/hh5+gdata/rr3+gdata/al33
+#PBS -l storage=gdata/w97+gdata/hh5+gdata/rr3+gdata/al33+gdata/oi10
 
 
 ### REQUIRES: ###
@@ -53,7 +53,7 @@ module load conda/analysis3-unstable
 ####################
 
 #Direcotry for storing processed datasets
-DIR="/g/data/w97/amu561/CABLE_AWRA_comparison/CMIP5_Data"
+DIR="/g/data/w97/amu561/CABLE_AWRA_comparison/CMIP5_data"
 
 
 
@@ -64,9 +64,9 @@ DIR="/g/data/w97/amu561/CABLE_AWRA_comparison/CMIP5_Data"
 dataset="cmip5"
 
 #Clef search with options for models, experiments, variables etc.
-search_criteria="--local $dataset --experiment historical \
-                 --experiment rcp45 --experiment rcp85 --variable mrro \
-                 --mip Lmon \
+search_criteria="--local $dataset --experiment historical --experiment rcp45 \
+		 -v pr -v mrro -v tas -v mrlsl -v mrros \
+		 --mip Amon --mip Lmon \
                  -m ACCESS1-0 -m MIROC5 -m GFDL-ESM2M -m CNRM-CM5 -en r1i1p1"
 
 
@@ -248,7 +248,7 @@ do
 
 
               #Skips files already processed to speed up processing
-              ext_files=(${processed_path}/*setgrid.nc)
+              ext_files=(${processed_path}/*_Aus.nc)
               
               if [ -e ${ext_files[0]} ]; then
                 echo "${M} - ${var_short} already processed, skipping"
@@ -533,10 +533,7 @@ do
   		        #Regrid using CDO sellonlatbox (note this adjusts lon variable
               #to range [-180, 180] but not lon_bounds)
               
-              
-              
   		        cdo sellonlatbox,-180,180,-90,90 $out_file $outfile_regrid
-
 
 
 
@@ -547,16 +544,16 @@ do
               #script to fix these (provided by Arden)
               python fix_lon.py "${outfile_regrid}"
 
-  		        #Remove temp file if cropping
-  		        #rm $outfile_temp
+							#Python returns a file by this name:
+							outfile_python=${out_file%".nc"}"_regrid_setgrid.nc"
 
-              
+              #Use this to crop Australia
               outfile_aus=${out_file%".nc"}"_Aus.nc"
-              cdo sellonlatbox,111.975,154.025,-44.025,-9.975 $outfile_regrid $outfile_aus
+              cdo sellonlatbox,111.975,154.025,-44.025,-9.975 $outfile_python $outfile_aus
 
 
   			      #Remove non-regridded file and merged time file
-  			      rm $out_file $outfile_regrid
+  			      rm $out_file $outfile_python
 
 
 
@@ -565,12 +562,12 @@ do
               ###########################################
 
               #Sanity check, does output file exist?
-              files_existing=`ls $processed_path/*setgrid_Aus.nc`
+              files_existing=`ls $outfile_aus`
 
               #Check if empty string. If so, cat to file
               if [ -z "$files_existing" ]; then
 
-                 echo $processed_path >> failed_files_${dataset}.txt
+                 echo $outfile_aus >> failed_files_${dataset}.txt
 
               fi
 
@@ -578,12 +575,8 @@ do
               #Calculate and save variable global mean. Use to check that variables are not corrupted
               check_dir="${OUT_DIR}/Data_checks/${E}/${var_short}/Global_mean/${M}/"
               mkdir -p $check_dir
-              
-              #The python script (fix_lon.py) resaves the file with a different name (setgrid*)
-              #Use this when calculating global mean
-              outfile_setgrid=${out_file%".nc"}"_regrid_setgrid_Aus.nc"
-              
-  			      cdo fldmean $outfile_setgrid ${check_dir}/${M}_global_mean_${var_short}.nc
+
+  			      cdo fldmean $outfile_aus ${check_dir}/${M}_${ens}_global_mean_${var_short}.nc
 
 
               
@@ -606,7 +599,7 @@ do
               ### Map of mean of all time slices ###
               
               files_regrid <- list.files(path="${OUT_DIR}/${E}/${var_short}/${M}/", recursive=TRUE, 
-                                         pattern="setgrid_Aus.nc", full.names=TRUE)    #regridded
+                                         pattern="_Aus.nc", full.names=TRUE)   
                                          
               data_regrid <- lapply(files_regrid, brick, stopIfNotEqualSpaced=FALSE)
 
@@ -623,7 +616,7 @@ do
           		### Global mean time series ###
               
           		files_mean <- list.files(path="${check_dir}", recursive=TRUE, 
-                                       pattern="${M}_global_mean", full.names=TRUE)
+                                       pattern="${M}_${ens}_global_mean", full.names=TRUE)
 
           		nc_handles <- lapply(files_mean, nc_open)
           		nc_data    <- lapply(nc_handles, ncvar_get, varid="${var_short}")
