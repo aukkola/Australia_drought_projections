@@ -16,7 +16,7 @@ baseline_end   <- c(1945)#, 1910)
 
 #End and start years (only save data for 1902-2100 to match the period common
 #to all models and obs)
-time_period <- c(1910, 2019)
+time_period <- c(1910, 2022)
 
 
 #Global warming levels
@@ -26,50 +26,31 @@ envelopes <- c(1,2,3)
 #Output directory
 outdir <- paste0(path, "/Global_warming_levels/baseline_", baseline_start,
                  "_", baseline_end, "/observed/")
-dir.create(outdir)
+dir.create(outdir, recursive=TRUE)
 
 
 #Observed temp file
-obs_file <- paste0(path, "/Observed_tair/Obs_mean_time_series/", 
-                   "Monthly_mean_temperature_time_series_Aus.nc")
+obs_file <- paste0(path, "/Bom_obs_temp_data/BoM_Aus_mean_temperature_", 
+                   "time_series_downloaded_17Mar2023.txt")
                    
-nc <- nc_open(obs_file)
-
-#variable called tmax because of a cdo command, but the file is tmean
-#couldn't be bothered to fix variable name
-data <- ncvar_get(nc, "tmax")
-
-
-time <- ncvar_get(nc, "time")
-
-time_units <- strsplit(ncatt_get(nc, "time")$units, "days since ")[[1]][2]
-
-#Convert to Y-M-D h-m-s
-time_date <- as.POSIXct(time*86400, origin=time_units, tz="GMT")
-
-#Get years
-years <- year(time_date)
+#Read data
+data <- read.table(obs_file)     
+                   
+#Geat years
+data_yrs <- as.numeric( substring(data[,1], 1,4 ))
 
 
 #select years
-start_ind <- which(years == time_period[1])[1]
-end_ind   <- tail(which(years == time_period[2]), n=1)
-
-
-monthly_temp <- data[start_ind:end_ind]
-
-
-#Calculate annual temp
-
+start_ind <- which(data_yrs == time_period[1])
+end_ind   <- which(data_yrs == time_period[2])
 
 
 
 #Calculate 10yr running mean 
-mean_10yr <- rollmean(annual_temp, k=10, fill=NA)
+mean_10yr <- rollmean(data[,2], k=10, fill=NA)
 
-#Dataset years
-data_yrs = data$Time[start_ind:end_ind]
-      
+
+
 for (b in 1:length(baseline_start)) {
   
   #Calculate pre-industrial mean for baseline
@@ -98,7 +79,7 @@ for (b in 1:length(baseline_start)) {
 
 
 outfile <- paste0(outdir, "/Monthly_indices_global_warming_levels_", min(envelopes), 
-                  "-", max(envelopes), "deg_CRUTEM5.0_observed.rds")
+                  "-", max(envelopes), "deg_BoM_observed.rds")
 
 #Save as R object
 saveRDS(monthly_indices, outfile)

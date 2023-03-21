@@ -618,7 +618,7 @@ do
           		par(mfcol=c(ceiling(sqrt(length(nc_data))), ceiling(sqrt(length(nc_data)))))
               
           		lapply(nc_data, function(x) plot(x, type="l", col="blue", 
-										                           ylab=${var_short}, xlab="Time step"))
+										                           ylab="${var_short}", xlab="Time step"))
           		dev.off()
 
 

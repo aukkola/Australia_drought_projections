@@ -65,8 +65,8 @@ dataset="cmip5"
 
 #Clef search with options for models, experiments, variables etc.
 search_criteria="--local $dataset --experiment historical --experiment rcp45 \
-		 -v pr -v mrro -v tas -v mrlsl -v mrros \
-		 --mip Amon --mip Lmon \
+		 						 --experiment rcp85 -v pr -v mrro -v tas -v mrlsl -v mrros -v mrso \
+		 					 	 --mip Amon --mip Lmon \
                  -m ACCESS1-0 -m MIROC5 -m GFDL-ESM2M -m CNRM-CM5 -en r1i1p1"
 
 

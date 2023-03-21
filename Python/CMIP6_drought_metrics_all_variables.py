@@ -33,7 +33,7 @@ import datetime
 ### Set paths ###
 
 root_path = "/g/data/w97/amu561/CABLE_AWRA_comparison/"
-lib_path  = root_path + '/Drought_metric_codes/functions' # '/drought_metric_scripts/Drought_metrics/functions'
+lib_path  = root_path + '/scripts/drought_scripts_AWRA/functions' # '/drought_metric_scripts/Drought_metrics/functions'
 
 
 sys.path.append(os.path.abspath(lib_path))
@@ -44,7 +44,7 @@ from drought_metrics import *
 ### Set variable ###
 
 #Rainfall, total runoff, standardised soil moisture, total soil moisture
-var_name=['pr' 'mrro' 'mrsol_std', 'mrso']
+var_name=['pr', 'mrro', 'mrsol_std', 'mrso']
 
 var_path=var_name #This one is only used to create path/file names
 
@@ -53,7 +53,7 @@ var_path=var_name #This one is only used to create path/file names
 ### Set experiments ###
 #######################
 
-experiment=['ssp126' 'ssp245' 'ssp370' 'ssp460' 'ssp585'] 
+experiment=['historical', 'ssp126', 'ssp245', 'ssp370', 'ssp460', 'ssp585'] 
 
 
 #################
@@ -89,14 +89,6 @@ monthly=True
 
 
 
-#Use observations/historical data for calculating threshold?
-#Uses this file to calculate baseline for drought metrics if true
-#(currently set to use historical simulation, see "obs_file" below)
-obs_ref = True
-obs_var = var_name   #ET_mean, ET_min, ET_max
-
-
-
 ##################
 ### Load files ###
 ##################
@@ -114,6 +106,16 @@ for s in range(len(scale)):
 
         #Loop through experiments
         for k in range(len(experiment)):
+
+            #Use observations/historical data for calculating threshold?
+            #Uses this file to calculate baseline for drought metrics if true
+            #(currently set to use historical simulation, see "obs_file" below)
+            if experiment[k] == "historical":
+                obs_ref = False
+            else:
+                obs_ref = True
+                obs_var = var_name   #ET_mean, ET_min, ET_max
+
 
             #List all model names
             models = os.listdir(root_path + '/CMIP6_data/Processed_CMIP6_data/' + 
@@ -319,15 +321,13 @@ for s in range(len(scale)):
                         rel_intensity     = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
                         rel_intensity_mon = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
 
-                        timing        = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
+                        timing            = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
 
                     if monthly:
-                        threshold_onset       = np.zeros((12, len(lat), len(lon))) + miss_val # * np.nan
-                        threshold_termination = np.zeros((12, len(lat), len(lon))) + miss_val # * np.nan
+                        threshold         = np.zeros((12, len(lat), len(lon))) + miss_val # * np.nan
 
                     else:
-                        threshold_onset       = np.zeros((len(lat), len(lon))) + miss_val # * np.nan
-                        threshold_termination = np.zeros((len(lat), len(lon))) + miss_val # * np.nan
+                        threshold         = np.zeros((len(lat), len(lon))) + miss_val # * np.nan
                 
                 
                     #########################
@@ -345,28 +345,28 @@ for s in range(len(scale)):
                              len(np.unique(data[:,i,j][~np.isnan(data[:,i,j])])) > 1):  
                              
                                  #Calculate metrics
-                                 metric = drought_metrics_two_threshold(mod_vec=data[:,i,j], lib_path=lib_path,
-                                                          perc_onset=perc_onset, perc_termination=perc_termination,
+                                 metric = drought_metrics(mod_vec=data[:,i,j], lib_path=lib_path,
+                                                          perc=perc,
                                                           monthly=monthly, obs_vec=control_ref[:,i,j],
                                                           return_all_tsteps=return_all_tsteps, scale=scale[s],
-                                                          add_metrics==(['rel_intensity', 'threshold', 
+                                                          add_metrics=(['rel_intensity', 'threshold', 
                                                           'rel_intensity_monthly','timing']),
                                                           subset=subset)
                             
         
-                                ### Write metrics to variables ###
-                                duration[range(np.size(metric['duration'])),i,j] = metric['duration']  #total drought duration (months)
+                                 ### Write metrics to variables ###
+                                 duration[range(np.size(metric['duration'])),i,j] = metric['duration']  #total drought duration (months)
 
-                                rel_intensity[range(np.size(metric['rel_intensity'])),i,j] = metric['rel_intensity'] #average magnitude
+                                 rel_intensity[range(np.size(metric['rel_intensity'])),i,j] = metric['rel_intensity'] #average magnitude
 
-                                rel_intensity_mon[range(np.size(metric['rel_intensity_monthly'])),i,j] = metric['rel_intensity_monthly'] #average magnitude
+                                 rel_intensity_mon[range(np.size(metric['rel_intensity_monthly'])),i,j] = metric['rel_intensity_monthly'] #average magnitude
                             
-                                timing[range(np.size(metric['timing'])),i,j] = metric['timing']    #drought timing (month index)
+                                 timing[range(np.size(metric['timing'])),i,j] = metric['timing']    #drought timing (month index)
 
-                                if monthly:
-                                    threshold[:,i,j] = metric['threshold'][0:12]    #drought timing (month index)
-                                else:
-                                    threshold[i,j]   = metric['threshold']
+                                 if monthly:
+                                     threshold[:,i,j] = metric['threshold'][0:12]    #drought timing (month index)
+                                 else:
+                                     threshold[i,j]   = metric['threshold']
                         
                                 
                     ##############################
