@@ -44,7 +44,7 @@ from drought_metrics import *
 ### Set variable ###
 
 #Rainfall, total runoff, standardised soil moisture, total soil moisture
-var_name=['pr', 'mrro', 'mrsol_std', 'mrso']
+var_name=['pr', 'mrro', 'mrsol_std_2.89m', 'mrso']
 
 var_path=var_name #This one is only used to create path/file names
 
@@ -121,6 +121,8 @@ for s in range(len(scale)):
             models = os.listdir(root_path + '/CMIP6_data/Processed_CMIP6_data/' + 
                                 experiment[k] + "/" + var_name[v] + "/")
 
+            if (len(models)) == 0:
+                continue
 
             #Reference data for calculating threshold
             for m in range(len(models)):
@@ -132,9 +134,9 @@ for s in range(len(scale)):
                 
                 
                     #Print progress
-                    print('Experiment: ' + str(k+1) + '/' + str(len(experiment)) + ', model: ' + 
-                          str(m+1) + "/" + str(len(models)) + ', ensemble:' + str(e+1) + '/' + 
-                          str(len(ensembles)) + " (model name: " + models[m] + ")")
+                    print('Variable: ' + var_name[v] + ', experiment: ' + experiment[k] + '(' + str(k+1) + '/' + str(len(experiment)) + '), model: ' + 
+                          models[m] + '(' + str(m+1) + "/" + str(len(models)) + '), ensemble:' + ensembles[e]+ '(' + str(e+1) + '/' + 
+                          str(len(ensembles)) + ")")
             
                       
                     #If using obs as reference (set to ET data, fix later if needed...)
@@ -144,7 +146,7 @@ for s in range(len(scale)):
                                              "/*_Aus.nc")
                     
                 
-                    ### Find CMIP5 files ###
+                    ### Find CMIP6 files ###
                     files = glob.glob(root_path + '/CMIP6_data/Processed_CMIP6_data/' + experiment[k] + 
                                       "/" + var_name[v] + "/" + models[m] + "/" + ensembles[e] + 
                                       "/*_Aus.nc")
@@ -167,7 +169,7 @@ for s in range(len(scale)):
                     #mask     = all_data.mask
                     fh_time     = fh.variables["time"]
 
-                    #Get lon and lat (name varies by CMIP5 model)
+                    #Get lon and lat (name varies by CMIP6 model)
                     try:
                         lat = fh.variables['latitude'][:]
                         lon = fh.variables['longitude'][:]
@@ -209,7 +211,7 @@ for s in range(len(scale)):
                         control_ref = obs_fh.variables[obs_var[v]][:] #.data ### TEMPORARY !!!!!!!!!!!!!!!!!!
                         obs_time    = obs_fh.variables["time"]
                     
-                        #Get lon and lat (name varies by CMIP5 model)
+                        #Get lon and lat (name varies by CMIP6 model)
                         try:
                             lat_ctrl = fh.variables['latitude'][:]
                             lon_ctrl = fh.variables['longitude'][:]
@@ -316,12 +318,12 @@ for s in range(len(scale)):
                         save_len = len(data)
                     else:
                         save_len = int(len(data)*(perc_onset/100)*2)
-                    
-                        duration          = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
-                        rel_intensity     = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
-                        rel_intensity_mon = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                
+                    duration          = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                    rel_intensity     = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                    rel_intensity_mon = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
 
-                        timing            = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
+                    timing            = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
 
                     if monthly:
                         threshold         = np.zeros((12, len(lat), len(lon))) + miss_val # * np.nan
@@ -346,7 +348,7 @@ for s in range(len(scale)):
                              
                                  #Calculate metrics
                                  metric = drought_metrics(mod_vec=data[:,i,j], lib_path=lib_path,
-                                                          perc=perc,
+                                                          perc=perc, miss_val=miss_val,
                                                           monthly=monthly, obs_vec=control_ref[:,i,j],
                                                           return_all_tsteps=return_all_tsteps, scale=scale[s],
                                                           add_metrics=(['rel_intensity', 'threshold', 
@@ -398,7 +400,7 @@ for s in range(len(scale)):
                     data_dur  = ncfile.createVariable('duration', 'f8',('time','lat','lon'), fill_value=miss_val)
                     data_mag  = ncfile.createVariable('rel_intensity','f8',('time','lat','lon'), fill_value=miss_val)
                     data_rel  = ncfile.createVariable('rel_intensity_by_month','f8',('time','lat','lon'), fill_value=miss_val)
-                    data_tim  = ncfile.createVariable('timing',   'i4',('time','lat','lon'), fill_value=miss_val)
+                    data_tim  = ncfile.createVariable('timing', 'i4',('time','lat','lon'), fill_value=miss_val)
 
                     #Create data variable for threshold
                     if monthly:
@@ -453,6 +455,7 @@ for s in range(len(scale)):
 
 
                     #Finally compress file
-                    os.system("nccompress -o " + out_file) 
-
-
+                    #Don't use overwrite option as fails for some files
+                    os.system("nccompress " + out_file) 
+                    os.system("mv " + out_path + "/tmp.nc_compress/*.nc" + " " + out_file)
+                    os.system("rm -r " + out_path + "/tmp.nc_compress/")

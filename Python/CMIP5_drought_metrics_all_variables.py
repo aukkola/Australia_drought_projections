@@ -14,21 +14,7 @@ import sys
 import os
 import datetime
 
-#fix to /g/data/w97/amu561/CMIP6_runoff_drought/CMIP6_data/Processed_CMIP6_data/ssp126/mrro/NorESM2-LM/r1i1p1f1
-# file=mrro_NorESM2-LM_ssp126_r1i1p1f1_mm_month_2015_2100_ssp126_regrid_setgrid.n
-# #Missing first January
-# file=`ls *setgrid.nc`
-# cp $file original_data_missing_tstep.nc
-# cdo seltimestep,1 $file first_month.nc
-# cdo shifttime,-1mon first_month.nc shifted.nc
-# cdo mergetime shifted.nc $file fixed.nc
-# mv fixed.nc $file
-# rm shifted.nc first_month.nc
 
-#All NorESM-LM and NorEMS-MM lai and mrro files were fixed
-#Also /g/data/w35/amu561/CMIP6_runoff_drought//CMIP6_data/Processed_CMIP6_data/ssp585/mrro/TaiESM1/r1i1p1f1/
-#mrro_TaiESM1_ssp585_r1i1p1f1_mm_month_2015_2100_ssp585_regrid_setgrid.nc
-#and equivalent LAI file
 
 ### Set paths ###
 
@@ -44,7 +30,7 @@ from drought_metrics import *
 ### Set variable ###
 
 #Rainfall, total runoff, standardised soil moisture, total soil moisture
-var_name=['pr', 'mrro', 'mrros', 'mrsol_std', 'mrso']
+var_name=['pr', 'mrro', 'mrros', 'mrsol_std_3m', 'mrso']
 
 var_path=var_name #This one is only used to create path/file names
 
@@ -122,14 +108,14 @@ for s in range(len(scale)):
 
 
             #List all model names
-            models = os.listdir(root_path + '/CMIP6_data/Processed_CMIP6_data/' + 
+            models = os.listdir(root_path + '/CMIP5_data/Processed_CMIP5_data/' + 
                                 experiment[k] + "/" + var_name[v] + "/")
 
 
             #Reference data for calculating threshold
             for m in range(len(models)):
 
-                ensembles=os.listdir(root_path + '/CMIP6_data/Processed_CMIP6_data/' + 
+                ensembles=os.listdir(root_path + '/CMIP5_data/Processed_CMIP5_data/' + 
                                      experiment[k] + "/" + var_name[v] + "/" + models[m])
                 
                 for e in range(len(ensembles)):
@@ -143,13 +129,13 @@ for s in range(len(scale)):
                       
                     #If using obs as reference (set to ET data, fix later if needed...)
                     if obs_ref:
-                        obs_file = glob.glob(root_path + '/CMIP6_data/Processed_CMIP6_data/historical/' +
+                        obs_file = glob.glob(root_path + '/CMIP5_data/Processed_CMIP5_data/historical/' +
                                              var_name[v] + "/" + models[m] + "/" + ensembles[e] +
                                              "/*_Aus.nc")
                     
                 
                     ### Find CMIP5 files ###
-                    files = glob.glob(root_path + '/CMIP6_data/Processed_CMIP6_data/' + experiment[k] + 
+                    files = glob.glob(root_path + '/CMIP5_data/Processed_CMIP5_data/' + experiment[k] + 
                                       "/" + var_name[v] + "/" + models[m] + "/" + ensembles[e] + 
                                       "/*_Aus.nc")
                     
@@ -314,12 +300,12 @@ for s in range(len(scale)):
                         save_len = len(data)
                     else:
                         save_len = int(len(data)*(perc_onset/100)*2)
-                    
-                        duration          = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
-                        rel_intensity     = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
-                        rel_intensity_mon = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                
+                    duration          = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                    rel_intensity     = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
+                    rel_intensity_mon = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan
 
-                        timing            = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
+                    timing            = np.zeros((save_len, len(lat), len(lon))) + miss_val # * np.nan    
 
                     if monthly:
                         threshold         = np.zeros((12, len(lat), len(lon))) + miss_val # * np.nan
@@ -343,11 +329,11 @@ for s in range(len(scale)):
                              len(np.unique(data[:,i,j][~np.isnan(data[:,i,j])])) > 1):  
                              
                                  #Calculate metrics
-                                 metric = drought_metrics (mod_vec=data[:,i,j], lib_path=lib_path,
-                                                          perc=perc,
+                                 metric = drought_metrics(mod_vec=data[:,i,j], lib_path=lib_path,
+                                                          perc=perc, miss_val=miss_val,
                                                           monthly=monthly, obs_vec=control_ref[:,i,j],
                                                           return_all_tsteps=return_all_tsteps, scale=scale[s],
-                                                          add_metrics=(['rel_intensity', 'threshold', 
+                                                          add_metrics=(['threshold', 
                                                           'rel_intensity_monthly','timing']),
                                                           subset=subset)
                             
@@ -451,6 +437,9 @@ for s in range(len(scale)):
 
 
                     #Finally compress file
-                    os.system("nccompress -o " + out_file) 
+                    #Don't use overwrite option as fails for some files
+                    os.system("nccompress " + out_file) 
+                    os.system("mv " + out_path + "/tmp.nc_compress/*.nc" + " " + out_file)
+                    os.system("rm -r " + out_path + "/tmp.nc_compress/")
 
 

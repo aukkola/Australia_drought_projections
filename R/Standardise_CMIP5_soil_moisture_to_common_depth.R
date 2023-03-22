@@ -54,6 +54,8 @@ max_depth <- min(sapply(depths, max), na.rm=TRUE)
 #Loop through experiments
 for (e in 1:length(experiments)) {
   
+  models <- list.files(paste(in_path, experiments[e], "mrlsl", sep="/"))
+  
   #Loop through models
   for(k in 1:length(models)){
     
@@ -148,7 +150,7 @@ for (e in 1:length(experiments)) {
       
       
       #Write output file
-      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname="mrsol_std", 
+      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
                   longname=paste("standardised mrlsl", max_depth, "m"), varunit="kg m-2",
                   xname="longitude", yname="latitude", zname="time", zunit=paste("months since Jan", start_yr))
       

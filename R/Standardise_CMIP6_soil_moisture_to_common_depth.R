@@ -58,6 +58,11 @@ lapply(nc, nc_close)
 #Loop through experiments
 for (e in 1:length(experiments)) {
   
+  
+  models <- list.files(paste(in_path, experiments[e], "mrsol", sep="/"))
+  
+  if(length(models) == 0) next
+  
   #Loop through models
   for(k in 1:length(models)){
     
@@ -99,7 +104,7 @@ for (e in 1:length(experiments)) {
         
         
         #Extract depth information
-        depths <- tryCatch(ncvar_get(nc, "depth_bnds"), error=function(e) ncvar_get(x, "sdepth_bnds"))
+        depths <- tryCatch(ncvar_get(nc, "depth_bnds"), error=function(e) ncvar_get(nc, "sdepth_bnds"))
         
         
         #Find which layer encompasses max_depth
@@ -154,7 +159,7 @@ for (e in 1:length(experiments)) {
       
       
       #Write output file
-      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname="mrsol_std", 
+      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
                   longname=paste("standardised mrsol", max_depth, "m"), varunit="kg m-2",
                   xname="longitude", yname="latitude", zname="time", zunit=paste("months since Jan", start_yr))
       
