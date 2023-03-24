@@ -93,6 +93,14 @@ for (e in 1:length(experiments)) {
       
       data <- ncvar_get(nc, "mrsol")
       
+      #Get calendar and time units (need this for drought metric calculation)
+      calendar <- ncatt_get(nc, 'time')$calendar
+      
+      tunits=ncatt_get(nc, 'time')$units
+      
+      time <- ncvar_get(nc, "time")
+      
+      
       
       #Initialise standardised data
       std_data <- array(NA, dim=c(dim(data)[1], dim(data)[2], dim(data)[4]))
@@ -134,7 +142,6 @@ for (e in 1:length(experiments)) {
       
       
       #Convert to raster brick
-      
       out_brick <- brick(std_data)
       
       #Flip if not matching raster
@@ -154,21 +161,58 @@ for (e in 1:length(experiments)) {
       start_yr <- substr(names(out_brick)[1], 2,5)
       end_yr   <- substr(names(out_brick)[nlayers(out_brick)], 2,5)
       
-      out_file <- paste(out_path, "/Monthly_standardised_mrsol_", max_depth, "m_", models[k], 
-                        "_", ensemble_members[ens], "_", start_yr, "_", end_yr, "_Aus.nc", sep="")
+      # #output file name (create a temp one and a final one)
+      # out_file_temp <- paste0(out_path, "/Monthly_standardised_mrsol_temp.nc")
+      # 
+      out_file <- paste0(out_path, "/Monthly_standardised_mrsol_", max_depth, "m_", models[k], 
+                        "_", ensemble_members[ens], "_", start_yr, "_", end_yr, "_Aus.nc")
       
       
       #Write output file
-      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
-                  longname=paste("standardised mrsol", max_depth, "m"), varunit="kg m-2",
-                  xname="longitude", yname="latitude", zname="time", zunit=paste("months since Jan", start_yr))
       
+      
+      xd = nc$dim[[3]]
+      yd = nc$dim[[4]]
+
+      # Define time dimension:
+      td = nc$dim[[1]]
+      
+      
+      sm_var <- ncdf4::ncvar_def(name=paste0("mrsol_std_", max_depth, "m"),
+                       units="kg m-2",
+                       dim=list(xd,yd,td),
+                       #missval=Nc_MissingVal,
+                       longname=paste("standardised mrsol", max_depth, "m"))
+      
+      # Create
+      ncid <- ncdf4::nc_create(out_file, vars=sm_var)
+      
+      ncdf4::ncvar_put(nc=ncid,
+                       varid=sm_var,
+                       vals=std_data)
+      
+      
+      # Close netcdf file:
+      ncdf4::nc_close(ncid)
+      
+      
+      
+      # 
+      # writeRaster(out_brick, out_file_temp, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
+      #             longname=paste("standardised mrsol", max_depth, "m"), varunit="kg m-2",
+      #             xname="longitude", yname="latitude", zname="time", zunit=tunits)
+      # 
       
       rm(data_raster)
       rm(data)
       rm(std_data)
       
-        
+      # #Set calendar using CDO. Need this for drought calculation code so it can
+      # #set time vector correctly
+      # system(paste0("cdo setcalendar,", calendar, " -settime,", time, " -settunits,'", tunits, "' ", out_file_temp, " ", out_file))
+      #   
+      #file.remove(out_file_temp)
+      
     } #ensemble
   } #model
 } #experiment

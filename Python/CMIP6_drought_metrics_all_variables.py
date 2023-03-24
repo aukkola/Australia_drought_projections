@@ -144,13 +144,23 @@ for s in range(len(scale)):
                         obs_file = glob.glob(root_path + '/CMIP6_data/Processed_CMIP6_data/historical/' +
                                              var_name[v] + "/" + models[m] + "/" + ensembles[e] +
                                              "/*_Aus.nc")
-                    
+                                             
+                        if len(obs_file) == 0:
+                            print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                                  ensembles[e] + ", no historical reference file found")
+                            continue
+
                 
                     ### Find CMIP6 files ###
                     files = glob.glob(root_path + '/CMIP6_data/Processed_CMIP6_data/' + experiment[k] + 
                                       "/" + var_name[v] + "/" + models[m] + "/" + ensembles[e] + 
                                       "/*_Aus.nc")
                     
+                    if len(files) == 0:
+                        print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                              ensembles[e] + ", no files found")
+                        continue
+                        
                     
                     #Skip EC-Earth3 runoff, missing years. Fix when available !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #if var_name[v]=="mrro" and models[m]=="EC-Earth3" and ensembles[e]=="r1i1p1f1":
@@ -181,6 +191,34 @@ for s in range(len(scale)):
                     #Get dataset dates
                     fh_dates = num2date(fh_time[:], fh_time.units, calendar=fh_time.calendar)
                     fh_years = np.array([y.year for y in fh_dates])
+
+
+                    #So many corrupt files in CMIP6 (especially EC-Earth but also MPI)
+                    #Check dataset years and skip if not starting/ending in the right year
+                    #Too much hassle to fix these manually
+                    #For historical, check that starts in 1850 and ends 2014
+                    #For future, check that starts in 2015 and that data goes
+                    #to at least 2099 (don't check for a specific end year as that differs by model)
+                    if experiment[k] == "historical" and (fh_years[0] != 1850 or fh_years[-1] != 2014):
+                        print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                              ensembles[e] + ", wrong end or start year")
+                        continue
+                    elif experiment[k] != "historical" and (fh_years[0] != 2015 or fh_years[-1] < 2099):
+                        print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                              ensembles[e] + ", wrong start or end year")
+                        continue
+
+                    #Also check for missing time steps. Should have time steps that
+                    #equal the number of years times 12 months
+                    #(need to use +1 in np.arange because of stupid python indexing, 
+                    #otherwise it doesn't include last year DUH)
+                    should_have=len(np.arange(fh_years[0], fh_years[-1]+1))*12
+                    
+                    if len(fh_years) != should_have:
+                        print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                              ensembles[e] + ", missing time steps (number of tsteps: " + str(len(fh_years)) +
+                              ", should have: " + str(should_have) + ")")
+                        continue
 
 
                     #fh.close()
@@ -227,6 +265,22 @@ for s in range(len(scale)):
                                              calendar=obs_time.calendar)
 
                         obs_years = np.array([y.year for y in obs_dates])
+
+
+                        #Check dataset years
+                        should_have_ref=len(np.arange(obs_years[0], obs_years[-1]+1))*12
+                        
+                        if len(obs_years) != should_have_ref:
+                            print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                                  ensembles[e] + ", missing time steps in ref data (number of tsteps: " + 
+                                  str(len(fh_years)) + ", should have: " + str(should_have_ref) + ")")
+                            continue
+                        
+                        #Check start and end year    
+                        if obs_years[0] != 1850 or obs_years[-1] != 2014:
+                            print("Skipping " + experiment[k] + ", " + models[m] + ", " + 
+                                  ensembles[e] + ", ref data has wrong end or start year")
+                            continue
 
 
                     else:

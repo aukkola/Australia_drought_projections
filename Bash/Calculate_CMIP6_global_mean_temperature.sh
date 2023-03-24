@@ -20,7 +20,7 @@ path="/g/data/w97/amu561/CABLE_AWRA_comparison"
 declare -a experiments=('historical' 'ssp126' 'ssp245' 'ssp370' 'ssp460' 'ssp585')
 
 #output path
-outdir=$path'/Global_mean_temp/'
+outdir=$path'/Global_mean_temp/CMIP6/'
 
 mkdir $outdir
 
