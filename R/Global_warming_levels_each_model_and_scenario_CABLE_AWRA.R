@@ -12,11 +12,11 @@ source(paste0(path, "/scripts/R/functions/nc_timing.R"))
 
 
 #Experiments
-experiments <- list.files(paste0(path, "/Global_mean_temp/CMIP6/"), pattern="ssp")
+experiments <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/"), pattern="rcp")
 
 #Only save indices up to 2100 (some models go well beyond this but want to keep
 #this consistent)
-end_year <- 2100 
+end_year <- 2099
 
 
 #Preindustrial baselines (to match CABLE/AWRA data availability)
@@ -30,54 +30,47 @@ baseline_end   <- c(2005)
 envelopes <- c(1,2) 
 
 #Output directory
-outdir <- paste0(path, "/Global_warming_levels/CMIP6/")
+outdir <- paste0(path, "/Global_warming_levels/CABLE_AWRA/")
 
 
 #Loop through experiments
 for (exp in 1:length(experiments)) {
   
-  #List models
-  models <- list.files(paste0(path, "/Global_mean_temp/CMIP6/", experiments[exp]))
+  #Find bias correction methods
+  bc_methods <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/", experiments[exp]))
   
-  
-  #Loop through models
-  for (m in 1:length(models)) {
+  for (b in 1:length(bc_methods)) {
     
+    #List models
+    models <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/", experiments[exp], 
+                                "/", bc_methods[b]))
     
-    ensembles <-  list.files(paste0(path, "/Global_mean_temp/CMIP6/", experiments[exp], 
-                                    "/", models[m]))
-  
-    
-    #Loop through ensembles
-    for (e in 1:length(ensembles)) {
+    #Loop through models
+    for (m in 1:length(models)) {
       
+    
       #Output file
       outfile <- paste0("Monthly_indices_global_warming_levels_", min(envelopes), 
-                        "-", max(envelopes), "deg_", experiments[exp], "_", models[m],
-                        "_", ensembles[e], ".rds")
+                        "-", max(envelopes), "deg_", experiments[exp], "_", bc_methods[b],
+                        "_", models[m], ".rds")
       
       if (file.exists(outfile)) next
       
       
       #Get historical data 
-      hist_file <- list.files(paste0(path, "/Global_mean_temp/CMIP6/historical/", 
-                                     models[m], "/", ensembles[e]), full.names=TRUE)
+      hist_file <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/historical/", 
+                                     bc_methods[b], "/", models[m]), full.names=TRUE)
       
-      if (length(hist_file) == 0) {
-        print(paste0("Skipping: ", models[m], ", ", ensembles[e], ", no historical file available"))
-        next
-      }
-      
-      hist_data <- read_nc_var(hist_file, var="tas")
+      hist_data <- read_nc_var(hist_file, var="tasmin") #called tasmin because of CDO combining tasmin and tasmax
 
       
       
       #Get future data
-      fut_file <- list.files(paste0(path, "/Global_mean_temp/CMIP6/",
-                             experiments[exp], "/", models[m], "/", ensembles[e]),
+      fut_file <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/",
+                             experiments[exp], "/",  bc_methods[b], "/", models[m]),
                              full.names=TRUE)
       
-      fut_data <- read_nc_var(fut_file, var="tas")
+      fut_data <- read_nc_var(fut_file, var="tasmin") #called tasmin because of CDO combining tasmin and tasmax
       
       
       #Combine historical and future periods
@@ -95,9 +88,8 @@ for (exp in 1:length(experiments)) {
       start_yr <- format(read_nc_time(hist_file), format="%Y")[1]
       
       
-      if (!(start_yr %in% c(1850, 2015))) {
-        print(paste0("Skipping: ", models[m], ",", ensembles[e], ", wrong historical start year (", start_yr, ")"))
-        next
+      if (start_yr != 1960) {
+        stop("wrong historical start year")
       }
       
       data_yrs <- seq(start_yr, by=1, length.out=length(annual_temp))
@@ -166,7 +158,7 @@ for (exp in 1:length(experiments)) {
         
         #Output directory
         outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
-                             "/", experiments[exp], "/", models[m], "/", ensembles[e])
+                             "/", experiments[exp], "/", bc_methods[b], "/", models[m])
         
         dir.create(outdir_mod, recursive=TRUE)
         
