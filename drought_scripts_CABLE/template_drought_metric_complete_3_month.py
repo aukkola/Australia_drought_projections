@@ -37,17 +37,23 @@ from drought_metrics import *
 ########################
 
 
+#Set scenario
+scenario=str(sys.argv[1])
+
 ### Set Models ###
-model=str(sys.argv[1])
+model=str(sys.argv[2])
 
 ### Set variable ###
-variable=str(sys.argv[2])
+variable=str(sys.argv[3])
 
 #CO2 directory
-co2 = str(sys.argv[3])
+co2 = str(sys.argv[4])
 
 #Output file
-out_file=str(sys.argv[4])
+out_file=str(sys.argv[5])
+
+#Scale
+scale=int(str(sys.argv[6]))
 
 
 ### Set drought metric conditions ###
@@ -60,7 +66,8 @@ perc=15
 ##########################################
 ##########################################
 ### Set scale for month aggregation ###
-scale=3
+#Passed from command line
+#scale=3
 ##########################################
 ##########################################
 ##########################################
@@ -95,7 +102,7 @@ files_to_merge=glob.glob(files_hist_string)
 
 #Future
 files_fut_string=str(data_path + '/CABLE_outputs/' + co2 +'/' + model + 
-                   '/rcp45/r240x120-MRNBC-AWAP/outputs/' + '/*.nc')
+                   '/' + scenario + '/r240x120-MRNBC-AWAP/outputs/' + '/*.nc')
 
 
 #Combine historical and future file names
@@ -110,7 +117,7 @@ os.system("mkdir -p " + temp_dir)
 
 ### Location of output file ###
 temp_file= str(temp_dir + "/" + co2 + "_" + 
-           model + "_" + variable + ".nc")
+           model + "_" + variable + "_" + scenario + ".nc")
 
 
 
@@ -193,20 +200,7 @@ data[mask==True] = miss_val
 
 control_ref = data
 
-###################################################
-### Create output file name and check if exists ###
-###################################################
-     
-# ### Define output path ###
-# out_path = f'/g/data/w97/amu561/Steven_CABLE_runs/drought_metrics_CABLE/{scale}-month/{co2}/{model}/'
-# 
-# if not os.path.exists(out_path):    
-#     os.makedirs(out_path)
-# 
-# #Create output file name
-# out_file = str(out_path + "/drought_metrics_CABLE_"  + model + "_" + 
-#                variable + "_rcp45_" + str(scale) + ".nc")
-# 
+
 
 #############################
 ### Find baseline indices ###

@@ -27,34 +27,47 @@ for model in CSIRO-BOM-ACCESS1-0 CNRM-CERFACS-CNRM-CM5 NOAA-GFDL-GFDL-ESM2M MIRO
     
     #Loop through CO2 options
     for co2 in CO2 noCO2; do
-                    
-      #Output directory
-      outdir="/g/data/w97/amu561/Steven_CABLE_runs/drought_metrics_CABLE/${scale}-month/${co2}/${model}/"  
-      mkdir -p $outdir
-      
-      #Output file
-      out_file=${outdir}/drought_metrics_CABLE_${co2}_${model}_${variable}.nc 
-           
-      #If output doesn't exist, process
-      if [ ! -f ${out_file} ]; then
 
-        pbs_job=${PBS_PATH}/job_${model}_${co2}_${variable}.sh
+      #Loop through scenarios
+      for scenario in rcp45 rcp85; do
+
+
+        #No data for constant CO2 for RCP8.5 scenario, skip
+        if [ $co2 == "noCO2" -a $scenario == "rcp85" ];
+        then
+          continue
+        fi
         
-        echo $model $variable $co2 $out_file $pbs_job
         
-        cp job_template_${scale}.sh $pbs_job
-        # wait 
-        # sed -i "s/MODEL/${model}/g" $pbs_job
-        # wait
-        # sed -i "s/VARIABLE/${variable}/g" $pbs_job
-        # wait
-        # sed -i "s/CO2/${co2}/g" $pbs_job
-        # wait
-        # sed -i "s/OUTFILE/${out_file}/g" $pbs_job
-        # wait
-        qsub -v "model=$model","variable=$variable","co2=$co2","out_file=$out_file" $pbs_job
+        #Output directory
+        outdir="/g/data/w97/amu561/Steven_CABLE_runs/drought_metrics_CABLE/${scale}-month/${co2}/${model}/"  
+        mkdir -p $outdir
         
-      fi  
+        #Output file
+        out_file=${outdir}/drought_metrics_CABLE_${co2}_${model}_${variable}_${scenario}.nc 
+             
+        #If output doesn't exist, process
+        if [ ! -f ${out_file} ]; then
+
+          echo "here"
+          pbs_job=${PBS_PATH}/job_${model}_${co2}_${variable}_${scenario}.sh
+          
+          echo $scenario $model $variable $co2 $out_file $pbs_job
+          
+          cp job_template_${scale}.sh $pbs_job
+          # wait 
+          # sed -i "s/MODEL/${model}/g" $pbs_job
+          # wait
+          # sed -i "s/VARIABLE/${variable}/g" $pbs_job
+          # wait
+          # sed -i "s/CO2/${co2}/g" $pbs_job
+          # wait
+          # sed -i "s/OUTFILE/${out_file}/g" $pbs_job
+          # wait
+          qsub -v "scenario=$scenario","model=$model","variable=$variable","co2=$co2","out_file=$out_file","scale=$scale" $pbs_job
+          
+        fi 
+      done 
     done  
   done
 done

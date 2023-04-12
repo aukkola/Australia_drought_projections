@@ -12,7 +12,7 @@ source(paste0(path, "/scripts/R/functions/nc_timing.R"))
 
 
 #Experiments
-experiments <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/"), pattern="rcp")
+experiments <- list.files(paste0(path, "/Global_mean_temp/BARPA/"), pattern="ssp")
 
 #Only save indices up to 2100 (some models go well beyond this but want to keep
 #this consistent)
@@ -30,39 +30,39 @@ baseline_end   <- c(2005)
 envelopes <- c(1,2) 
 
 #Output directory
-outdir <- paste0(path, "/Global_warming_levels/CABLE_AWRA/")
+outdir <- paste0(path, "/Global_warming_levels/BARPA/")
 
 
 #Loop through experiments
 for (exp in 1:length(experiments)) {
   
-  #Find bias correction methods
-  bc_methods <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/", experiments[exp]))
-  
-  for (bc in 1:length(bc_methods)) {
+  #List models
+  models <- list.files(paste0(path, "/Global_mean_temp/BARPA/", experiments[exp]))
     
-    #List models
-    models <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/", experiments[exp], 
-                                "/", bc_methods[bc]))
+
+  #Loop through models
+  for (m in 1:length(models)) {
+      
+    #List ensembles
+    ensembles <- list.files(paste0(path, "/Global_mean_temp/BARPA/", experiments[exp],
+                                   "/", models[m]))
     
-    #Loop through models
-    for (m in 1:length(models)) {
+    for (e in 1:length(ensembles)) {
       
       
       #Get historical data 
-      hist_file <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/historical/", 
-                                     bc_methods[bc], "/", models[m]), full.names=TRUE)
+      hist_file <- list.files(paste0(path, "/Global_mean_temp/BARPA/historical/", 
+                                     models[m], "/", ensembles[e]), full.names=TRUE)
       
-      hist_data <- read_nc_var(hist_file, var="tasmin") #called tasmin because of CDO combining tasmin and tasmax
-
+      hist_data <- tryCatch(read_nc_var(hist_file, var="tasmean"), error=function(e) read_nc_var(hist_file, var="tas"))
       
       
       #Get future data
-      fut_file <- list.files(paste0(path, "/Global_mean_temp/CABLE_AWRA/",
-                             experiments[exp], "/",  bc_methods[bc], "/", models[m]),
+      fut_file <- list.files(paste0(path, "/Global_mean_temp/BARPA/",
+                                    experiments[exp], "/", models[m], "/", ensembles[e]),
                              full.names=TRUE)
       
-      fut_data <- read_nc_var(fut_file, var="tasmin") #called tasmin because of CDO combining tasmin and tasmax
+      fut_data <- tryCatch(read_nc_var(fut_file, var="tasmean"), error=function(e) read_nc_var(fut_file, var="tas"))
       
       
       #Combine historical and future periods
@@ -85,7 +85,7 @@ for (exp in 1:length(experiments)) {
       }
       
       data_yrs <- seq(start_yr, by=1, length.out=length(annual_temp))
-
+      
       
       #Extract time period to stop in 2100
       #(some models end in 2099, use this instead)
@@ -94,11 +94,11 @@ for (exp in 1:length(experiments)) {
       } else {
         end   <- which(data_yrs == end_year)
       }
-
+      
       data_yrs    <- data_yrs[1:end]
       annual_temp <- annual_temp[1:end]
-
-
+      
+      
       
       #Calculate 10yr running mean 
       mean_10yr <- rollmean(annual_temp, k=10, fill=NA)
@@ -113,8 +113,8 @@ for (exp in 1:length(experiments)) {
         
         
         yr_ind <- lapply(envelopes, function(x) which(mean_10yr >= (preind_mean+x-0.3) &
-                                                      mean_10yr <=  (preind_mean+x+0.3)))
-
+                                                        mean_10yr <=  (preind_mean+x+0.3)))
+        
         
         
         #Take out the historical period from the indices so they are relative to
@@ -140,33 +140,31 @@ for (exp in 1:length(experiments)) {
         #Then convert to monthly indices
         #awful mess but takes start and end index for each decadal slice and converts to monthly
         monthly_indices <- lapply(1:length(start_ind), function(x) if (length(start_ind[[x]]) > 0)
-                                                                    ((min(start_ind[[x]])-1)*12+1) :  #previous year plus one month
-                                                                    (max(yr_ind[[x]])*12)) #end year times 12 months
-                                    
+          ((min(start_ind[[x]])-1)*12+1) :  #previous year plus one month
+            (max(yr_ind[[x]])*12)) #end year times 12 months
+        
         names(monthly_indices) <- paste0(envelopes, "deg")
         
-          
+        
         ### Save indices ###
         
         #Output directory
         outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
-                             "/", experiments[exp], "/", bc_methods[bc], "/", models[m])
+                             "/", experiments[exp], "/", models[m], "/", ensembles[e])
         
         dir.create(outdir_mod, recursive=TRUE)
         
         
         #Output file
         outfile <- paste0(outdir_mod, "/Monthly_indices_global_warming_levels_", min(envelopes), 
-                          "-", max(envelopes), "deg_", experiments[exp], "_", bc_methods[bc],
-                          "_", models[m], ".rds")
+                          "-", max(envelopes), "deg_", experiments[exp], "_", 
+                          models[m], "_", ensembles[e], ".rds")
         
         
         #Save as R object
         saveRDS(monthly_indices, outfile)
         
-      }
-      
-    }
-  }
-
-}
+      } #baselines
+    } #ensembles
+  } #models
+} #experiments

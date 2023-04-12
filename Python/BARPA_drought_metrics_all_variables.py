@@ -318,13 +318,13 @@ for s in range(len(scale)):
                     #Read reference data used to calculate threshold
                     if obs_ref:
                         obs_fh      = Dataset(temp_ref_file, mode='r')            
-                        control_ref = fh.variables[var_name[v]][:].data
+                        control_ref = obs_fh.variables[var_name[v]][:].data
                         #control_ref     = all_data.data 
-                        obs_time   = fh.variables["time"]
+                        obs_time   = obs_fh.variables["time"]
                         
                         #Get lon and lat 
-                        lat_ctrl = fh.variables['lat'][:] #northing
-                        lon_ctrl = fh.variables['lon'][:] #easting
+                        lat_ctrl = obs_fh.variables['lat'][:] #northing
+                        lon_ctrl = obs_fh.variables['lon'][:] #easting
 
                         print("Using an OBS/model ref to calculate baseline")
 

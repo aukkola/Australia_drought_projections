@@ -15,81 +15,83 @@ module load cdo
 
 path="/g/data/w97/amu561/CABLE_AWRA_comparison"
 
-met_path="/g/data/wj02/COMPLIANT_PUBLISHED/HMINPUT/output/AUS-5/BoM/"
+met_path="/g/data/ia39/australian-climate-service/release/CORDEX-CMIP6/output/AUS-15/BOM/"
 
 #Experiments to process
-declare -a experiments=('historical' 'rcp45' 'rcp85')
+declare -a experiments=('historical' 'ssp126' 'ssp370')
 
 #output path
-outdir=$path'/Global_mean_temp/CABLE_AWRA/'
+outdir=$path'/Global_mean_temp/BARPA/'
 
 mkdir $outdir
 
 
-#Use CABLE/AWRA data to mask out oceans
-#Ideally would use models' own land masks but these are not available for all
-#models. 
-awap_mask=$path/landsea/landsea_mask_AWRA_fixed.nc
+#Use monthly processed mrro data to mask out oceans
+#Note this is stored on scratch so will cease to exist after some time
+#can be recreated using the drought metric codes
+mrro_mask="/scratch/w97/amu561/monthly_sums_BARPA/historical_EC-Earth-Consortium-EC-Earth3_r1i1p1f1_mrro.nc"
 
 
 #Loop through experiments
 for exp in "${experiments[@]}"
 do
   
-  #List models
-  bc_methods=`ls $path/../Steven_CABLE_runs/drought_metrics/3-month/`
-  
-  for b in $bc_methods
-  do
-  
-    models=`ls $path/../Steven_CABLE_runs/drought_metrics/3-month/${b}/`
+  #list models
+  models=`ls $met_path`
+
   
     for mod in $models
     do
       
-      #Outfile
-      outdir_mod=$outdir"/"$exp"/"$b"/"$mod
-      mkdir -p $outdir_mod
-            
-      outfile=$outdir_mod"/"${exp}"_"${mod}"_"${b}"_global_mean_temp.nc"
-
-      #If exists, skip model/bc combo
-      if [ -e $outfile ];
+      #Skip ECMWF-ERA5, only historical evaluation data
+      if [ $mod == "ECMWF-ERA5" ];
       then
-        echo "$exp, $mod, $b exists, skipping"
         continue
-      fi  
-        
-      #The BC method names are longer in the BoM folder
-      #Match using the shorter bc name (CCAM has two folders, need to pick correct one)
-      if [ $b == "CCAM" ];
-      then
-        pattern="*${b}*ISIMIP*"
-      else
-        pattern="r240x120-${b}-AWAP"
       fi
       
       
-      #Find file
-      tasmin_file=`ls ${met_path}/${mod}/${exp}/r1i1p1/${pattern}/latest/day/tasmin/*.nc`
-      tasmax_file=`ls ${met_path}/${mod}/${exp}/r1i1p1/${pattern}/latest/day/tasmin/*.nc`
+      #List ensemble members
+      ensembles=`ls ${met_path}/${mod}/${exp}/`
+
+      #Loop through ensemble members
+      for ens in $ensembles
+      do
       
-      #First calculate monthly means from daily data
-      tmin_temp="${outdir_mod}/tmin_temp.nc"
-      tmax_temp="${outdir_mod}/tmax_temp.nc"
+        
+        #Outfile
+        outdir_mod=$outdir"/"$exp"/"$mod"/"${ens}
+        mkdir -p $outdir_mod
+              
+        outfile=$outdir_mod"/"${exp}"_"${mod}"_"${ens}"_global_mean_temp.nc"
 
-      cdo monmean $tasmin_file $tmin_temp
-      cdo monmean $tasmax_file $tmax_temp
-      
+        #If exists, skip model/bc combo
+        if [ -e $outfile ];
+        then
+          echo "$exp, $mod, $b exists, skipping"
+          continue
+        fi  
+        
+        
+        #Find files
+        #Some mean temp files seem to be in a folder called "tas" and others
+        #in "tasmean". Need to deal with this
+        
+        if [ -d "${met_path}/${mod}/${exp}/${ens}/BOM-BARPA-R/v1/mon/tas/" ];
+        then
+          tas_files=`ls ${met_path}/${mod}/${exp}/${ens}/BOM-BARPA-R/v1/mon/tas/*.nc`
+        else
+          tas_files=`ls ${met_path}/${mod}/${exp}/${ens}/BOM-BARPA-R/v1/mon/tasmean/*.nc`
+        fi      
+        
 
-      #Then calculate mean temperature
-      temp_file="${outdir_mod}/temp.nc"
-      cdo ensmean $tmin_temp $tmax_temp $temp_file
+        #Then calculate mean temperature
+        temp_file=${outdir_mod}"/temp.nc"
+        cdo -L mergetime $tas_files $temp_file
 
-      #Calculate global mean (excludes Antarctica through GRUN masking)
-      cdo -L fldmean $temp_file $outfile
+        #Calculate global mean (excludes Antarctica through GRUN masking)
+        cdo -L fldmean $temp_file $outfile
           
-      rm $temp_file $tmin_temp $tmax_temp
+        rm $temp_file
       
     done #ensembles
     

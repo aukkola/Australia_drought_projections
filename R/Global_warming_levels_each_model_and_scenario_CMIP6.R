@@ -51,8 +51,17 @@ for (exp in 1:length(experiments)) {
     #Loop through ensembles
     for (e in 1:length(ensembles)) {
       
+      
+      #Output directory
+      outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
+                           "/", experiments[exp], "/", models[m], "/", ensembles[e])
+      
+      dir.create(outdir_mod, recursive=TRUE)
+      
+      
+      
       #Output file
-      outfile <- paste0("Monthly_indices_global_warming_levels_", min(envelopes), 
+      outfile <- paste0(outdir_mod, "/Monthly_indices_global_warming_levels_", min(envelopes), 
                         "-", max(envelopes), "deg_", experiments[exp], "_", models[m],
                         "_", ensembles[e], ".rds")
       
@@ -164,15 +173,9 @@ for (exp in 1:length(experiments)) {
           
         ### Save indices ###
         
-        #Output directory
-        outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
-                             "/", experiments[exp], "/", models[m], "/", ensembles[e])
-        
-        dir.create(outdir_mod, recursive=TRUE)
-        
-        
+          
         #Save as R object
-        saveRDS(monthly_indices, paste0(outdir_mod, "/", outfile))
+        saveRDS(monthly_indices, outfile)
         
       }
       
