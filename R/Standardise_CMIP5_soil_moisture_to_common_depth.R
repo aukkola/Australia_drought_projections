@@ -134,9 +134,6 @@ for (e in 1:length(experiments)) {
       }
       
       #Set extent and layer names
-      
-      
-      
       extent(out_brick) <- extent(data_raster)
       names(out_brick)  <- names(data_raster)
       
@@ -150,10 +147,38 @@ for (e in 1:length(experiments)) {
       
       
       #Write output file
-      writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
-                  longname=paste("standardised mrlsl", max_depth, "m"), varunit="kg m-2",
-                  xname="longitude", yname="latitude", zname="time", zunit=paste("months since Jan", start_yr))
       
+      
+      xd = nc$dim[[3]]
+      yd = nc$dim[[4]]
+      
+      # Define time dimension:
+      td = nc$dim[[1]]
+      
+      
+      sm_var <- ncdf4::ncvar_def(name=paste0("mrsol_std_", max_depth, "m"),
+                                 units="kg m-2",
+                                 dim=list(xd,yd,td),
+                                 #missval=Nc_MissingVal,
+                                 longname=paste("standardised mrlsl ", max_depth, "m"))
+      
+      # Create
+      ncid <- ncdf4::nc_create(out_file, vars=sm_var)
+      
+      ncdf4::ncvar_put(nc=ncid,
+                       varid=sm_var,
+                       vals=std_data)
+      
+      
+      # Close netcdf file:
+      ncdf4::nc_close(ncid)
+
+    
+      # #Write output file
+      # writeRaster(out_brick, out_file, format="CDF", overwrite=TRUE, varname=paste0("mrsol_std_", max_depth, "m"), 
+      #             longname=paste("standardised mrlsl", max_depth, "m"), varunit="kg m-2",
+      #             xname="longitude", yname="latitude", zname="time", zunit=paste("months since Jan", start_yr))
+      # 
       
       rm(data_raster)
       rm(data)

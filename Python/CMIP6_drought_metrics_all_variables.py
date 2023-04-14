@@ -44,7 +44,7 @@ from drought_metrics import *
 ### Set variable ###
 
 #Rainfall, total runoff, standardised soil moisture, total soil moisture
-var_name=['pr', 'mrro', 'mrsol_std_2.89m', 'mrso']
+var_name=['pr', 'mrro', 'mrsol_std_2.89m']
 
 var_path=var_name #This one is only used to create path/file names
 

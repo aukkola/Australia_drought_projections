@@ -7,6 +7,9 @@ rm(list=ls(all=TRUE))
 
 path <- "/g/data/w97/amu561/CABLE_AWRA_comparison/"
 
+#Source function
+source(paste0(path, "/scripts/R/functions/freq.R"))
+
 
 #Output directory
 outdir <- paste0(path, "/Mean_drought_metrics/")
@@ -25,6 +28,9 @@ metrics <- list(duration="duration",
 units <- list(duration="months", 
               rel_intensity="%", 
               time_in_drought="%")
+
+#Parallelise
+beginCluster(12)
 
 
 ############
@@ -100,15 +106,14 @@ for (exp in 1:length(experiments)) {
           if (metrics[[m]] == "timing") {
             
             #Calculate time under drought (in %)
-            hist_mean <- sum(data[[start_ind : end_ind]], na.rm=TRUE) /
-                         length(start_ind : end_ind) * 100
+            hist_mean <- clusterR(data[[start_ind:end_ind]], calc, args=list(fun=freq))
             
           } else {
             #Take mean of the metric
-            hist_mean <- mean(data[[start_ind : end_ind]], na.rm=TRUE)
+            hist_mean <- clusterR(data[[start_ind : end_ind]], mean, args=list(na.rm=TRUE)) #mean(data[[start_ind : end_ind]], na.rm=TRUE)
           }
-          
-          
+  
+         
           #Save historical data
           outdir_hist <- paste0(outdir_mod, "/historical/", bc_methods[bc], "/", gcms[g])
           
@@ -144,23 +149,25 @@ for (exp in 1:length(experiments)) {
             if (metrics[[m]] == "timing") {
               
               #Calculate time under drought (in %)
-              fut_mean <- sum(data[[inds]], na.rm=TRUE) /
-                          length(inds) * 100
+              fut_mean <- clusterR(data[[inds]], calc, args=list(fun=freq))
               
             } else {
               #Take mean of the metric
-              fut_mean <- mean(data[[inds]], na.rm=TRUE)
+              fut_mean <- clusterR(data[[inds]], mean, args=list(na.rm=TRUE))
             }
+            
             
             #Save future data
             outdir_fut <- paste0(outdir_mod, "/", w, "deg/", bc_methods[bc], "/", gcms[g])
             dir.create(outdir_fut, recursive=TRUE)
             
             fut_outfile <- paste0(outdir_fut, "/", w, "deg_mean_", variables[v], "_",
-                                  names(metrics)[m], "_", bc_methods[bc], "_", gcms[g], ".nc")
+                                  names(metrics)[m], "_", bc_methods[bc], "_", gcms[g], "_",
+                                  experiments[exp], ".nc")
             
             writeRaster(fut_mean, fut_outfile, overwrite=TRUE, varname=names(metrics)[m],
                         longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+            
             
           } #GW levels
         } #metrics
@@ -213,6 +220,9 @@ for (exp in 1:length(experiments)) {
         #Check that found one file each
         if(length(file) != 1) stop("wrong number of CABLE files")
         
+        #Progress
+        print(paste0("file: ", file)) 
+        
         
         #Loop through metrics
         for (m in 1:length(metrics)) {
@@ -243,18 +253,6 @@ for (exp in 1:length(experiments)) {
           start_ind <- which(years == hist_ref[1])[1]
           end_ind   <- tail(which(years == hist_ref[2]), n=1)
           
-          if (metrics[[m]] == "timing") {
-            
-            #Calculate time under drought (in %)
-            hist_mean <- sum(data[[start_ind : end_ind]], na.rm=TRUE) /
-              length(start_ind : end_ind) * 100
-            
-          } else {
-            #Take mean of the metric
-            hist_mean <- mean(data[[start_ind : end_ind]], na.rm=TRUE)
-          }
-          
-          
           #Save historical data
           outdir_hist <- paste0(outdir_mod, "/historical/", co2[c], "/", gcms[g])
           
@@ -263,19 +261,35 @@ for (exp in 1:length(experiments)) {
           hist_outfile <- paste0(outdir_hist, "/Historical_mean_", variables[v], "_",
                                  names(metrics)[m], "_", co2[c], "_", gcms[g], ".nc")
           
-          writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
-                      longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
           
+          if (!file.exists(hist_outfile)) {
+            
+            if (metrics[[m]] == "timing") {
+              
+              #Calculate time under drought (in %)
+              hist_mean <- clusterR(data[[start_ind:end_ind]], calc, args=list(fun=freq))
+              
+            } else {
+              #Take mean of the metric
+              hist_mean <- clusterR(data[[start_ind : end_ind]], mean, args=list(na.rm=TRUE))
+            }
+            
+            
+            
+            writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
+                        longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+          }
+
           
           ###################
           ### Future data ###
           ###################
           
           
-          #Read index file for global warming levels
+          #Read index file for global warming levels (use MRNBC bc method as that was CABLE input)
           gw_indices <- readRDS(list.files(paste0(path, "/Global_warming_levels/",
                                                   "CABLE_AWRA/baseline_1970_2005/", 
-                                                  experiments[exp], "/", bc_methods[bc], "/",
+                                                  experiments[exp], "/MRNBC/",
                                                   gcms[g]), pattern=".rds", full.names=TRUE))
           
           #Loop through global warming levels
@@ -287,27 +301,34 @@ for (exp in 1:length(experiments)) {
             if (length(inds) == 0) next
             
             
-            if (metrics[[m]] == "timing") {
-              
-              #Calculate time under drought (in %)
-              fut_mean <- sum(data[[inds]], na.rm=TRUE) /
-                length(inds) * 100
-              
-            } else {
-              #Take mean of the metric
-              fut_mean <- mean(data[[inds]], na.rm=TRUE)
-            }
-            
             #Save future data
             outdir_fut <- paste0(outdir_mod, "/", w, "deg/", co2[c], "/", gcms[g])
             dir.create(outdir_fut, recursive=TRUE)
             
             fut_outfile <- paste0(outdir_fut, "/", w, "deg_mean_", variables[v], "_",
-                                  names(metrics)[m], "_", co2[c], "_", gcms[g], ".nc")
+                                  names(metrics)[m], "_", co2[c], "_", gcms[g], "_",
+                                  experiments[exp], ".nc")
             
-            writeRaster(fut_mean, fut_outfile, overwrite=TRUE, varname=names(metrics)[m],
-                        longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+            if (!file.exists(fut_outfile)) {
+              
+              if (metrics[[m]] == "timing") {
+                
+                #Calculate time under drought (in %)
+                fut_mean <- clusterR(data[[inds]], calc, args=list(fun=freq))
+                
+              } else {
+                #Take mean of the metric
+                fut_mean <- clusterR(data[[inds]], mean, args=list(na.rm=TRUE))
+              }
+              
+              
+              #Write output
+              writeRaster(fut_mean, fut_outfile, overwrite=TRUE, varname=names(metrics)[m],
+                          longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+ 
+            }
             
+               
           } #GW levels
         } #metrics
       } #variables
@@ -316,10 +337,6 @@ for (exp in 1:length(experiments)) {
 } #experiments
 
 
-
-
-
-
-
+endCluster()
 
 
