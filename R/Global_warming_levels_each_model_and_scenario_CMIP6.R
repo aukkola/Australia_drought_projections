@@ -51,23 +51,7 @@ for (exp in 1:length(experiments)) {
     #Loop through ensembles
     for (e in 1:length(ensembles)) {
       
-      
-      #Output directory
-      outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
-                           "/", experiments[exp], "/", models[m], "/", ensembles[e])
-      
-      dir.create(outdir_mod, recursive=TRUE)
-      
-      
-      
-      #Output file
-      outfile <- paste0(outdir_mod, "/Monthly_indices_global_warming_levels_", min(envelopes), 
-                        "-", max(envelopes), "deg_", experiments[exp], "_", models[m],
-                        "_", ensembles[e], ".rds")
-      
-      if (file.exists(outfile)) next
-      
-      
+        
       #Get historical data 
       hist_file <- list.files(paste0(path, "/Global_mean_temp/CMIP6/historical/", 
                                      models[m], "/", ensembles[e]), full.names=TRUE)
@@ -172,6 +156,20 @@ for (exp in 1:length(experiments)) {
         
           
         ### Save indices ###
+        
+        
+        #Output directory
+        outdir_mod <- paste0(outdir, "/baseline_", baseline_start[b], "_",  baseline_end[b],
+                             "/", experiments[exp], "/", models[m], "/", ensembles[e])
+        
+        dir.create(outdir_mod, recursive=TRUE)
+        
+        
+        
+        #Output file
+        outfile <- paste0(outdir_mod, "/Monthly_indices_global_warming_levels_", min(envelopes), 
+                          "-", max(envelopes), "deg_", experiments[exp], "_", models[m],
+                          "_", ensembles[e], ".rds")
         
           
         #Save as R object

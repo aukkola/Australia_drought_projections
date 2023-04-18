@@ -8,7 +8,7 @@
 #PBS -l ncpus=1
 #PBS -l mem=1gb
 
-path="/g/data/oq98/amu561/Steven_CABLE_runs/"
+path="/g/data/oq98/amu561/CABLE_AWRA_comparison/"
 
 PBS_PATH=${path}/scripts/drought_scripts_CABLE/pbs_jobs
 

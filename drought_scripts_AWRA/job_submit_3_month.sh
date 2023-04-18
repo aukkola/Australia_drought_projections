@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #PBS -P oq98
-#PBS -q normal
+#PBS -q normalbw
 #PBS -j oe
 #PBS -l storage=gdata/er4+scratch/w97+gdata/hh5+gdata/wj02+gdata/w97+gdata/oq98
 #PBS -N drought_metric_job_BIAS-METHOD_MODEL_SCENARIO_VARIABLE_REGION 
@@ -9,11 +9,11 @@
 #PBS -l ncpus=1
 #PBS -l mem=1gb
 
-PBS_PATH=/g/data/oq98/amu561/Steven_CABLE_runs/scripts/drought_scripts/pbs_jobs
+PBS_PATH=/g/data/oq98/amu561/CABLE_AWRA_comparison/scripts/drought_scripts_AWRA/pbs_jobs
 
 mkdir -p ${PBS_PATH}
 
-cd /g/data/oq98/amu561/Steven_CABLE_runs/scripts/drought_scripts
+cd /g/data/oq98/amu561/CABLE_AWRA_comparison/scripts/drought_scripts_AWRA
 
 #for bcm in MRNBC; do
 for bcm in QME MRNBC CCAM ISIMIP2b; do
@@ -24,9 +24,9 @@ for bcm in QME MRNBC CCAM ISIMIP2b; do
             #for variable in qtot s0; do
             for variable in qtot s0 pr; do
                               
-		            outdir="/g/data/w97/amu561/Steven_CABLE_runs/drought_metrics/3-month/${bcm}/${model}/"  
+		            outdir="/g/data/w97/amu561/CABLE_AWRA_comparison/Drought_metrics/AWRA/3-month/${bcm}/${model}/"  
                 mkdir -p $outdir
-		            out_file=/g/data/w97/amu561/Steven_CABLE_runs/drought_metrics/3-month/${bcm}/${model}/drought_metrics_${bcm}_${model}_${variable}_${scenario}_3.nc 
+		            out_file=$outdir/drought_metrics_${bcm}_${model}_${variable}_${scenario}_3.nc 
                      
                 if [ ! -f ${out_file} ]; then
 

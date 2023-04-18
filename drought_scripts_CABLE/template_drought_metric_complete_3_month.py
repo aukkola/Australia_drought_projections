@@ -101,7 +101,7 @@ files_hist_string=str(data_path + '/CABLE_outputs/' + co2 +'_compressed/' + mode
 files_to_merge=glob.glob(files_hist_string)
 
 #Future
-files_fut_string=str(data_path + '/CABLE_outputs/' + co2 +'/' + model + 
+files_fut_string=str(data_path + '/CABLE_outputs/' + co2 +'_compressed/' + model + 
                    '/' + scenario + '/r240x120-MRNBC-AWAP/outputs/' + '/*.nc')
 
 

@@ -18,9 +18,9 @@ import xarray as xr
 
 lib_path  = "/g/data/w97/amu561/Steven_CABLE_runs/scripts/drought_scripts/functions"
 
-##### ALTERTED #####
-data_path = "/g/data/w97/amu561/Steven_CABLE_runs/"
-#data_path = "/g/data/wj02/AWRA_OUTPUT"
+##### ALTERED #####
+#data_path = "/g/data/w97/amu561/Steven_CABLE_runs/"
+data_path = "/g/data/wj02/COMPLIANT_PUBLISHED/"
 
 scratch_path = '/scratch/w97/amu561/'
 
@@ -79,10 +79,9 @@ baseline=[1970,2005]
 ##########################
 
 ### Define file locations ###
-output_variable=['Qsb','SoilMoist']
+input_variable=['pr']
+output_variable=['qtot','s0']
 
-compliant=['MRNBC']
-#non_compliant=['RAW-GCM','NOBC-CCAM']
 
 # Any output data from CCAM has a slightly differenet path
 ccam_add=""
@@ -93,40 +92,40 @@ awra_add=""
 if variable in output_variable:
     awra_add='AWRALv6-1-'
 
-if variable in input_variable and bias_corr in compliant:
+if variable in input_variable: # and bias_corr in compliant:
     data_path_var= data_path + "/HMINPUT/output/AUS-5/BoM"
 
-if variable in output_variable and bias_corr in compliant:
+if variable in output_variable: # and bias_corr in compliant:
     data_path_var= data_path + "/HMOUTPUT/output/AUS-5/BoM"
 
 ### Get historical and future simulations ###
 
 #historical
 if bias_corr=="CCAM":
-    files_1_string=str(data_path_var + '/' + awra_add + model + '/historical/r1i1p1/' +
+    files_hist=str(data_path_var + '/' + awra_add + model + '/historical/r1i1p1/' +
                        ccam_add + 'r240x120-ISIMIP2b-AWAP/latest/day/' +
-                       variable+ '/*1960*.nc')
+                       variable + '/*1960*.nc')
 else:
-    files_1_string=str(data_path_var + '/' + awra_add + model +'/historical/r1i1p1/' +
+    files_hist=str(data_path_var + '/' + awra_add + model +'/historical/r1i1p1/' +
                        ccam_add + 'r240x120-' + bias_corr + '-AWAP/latest/day/' +
                        variable + '/*1960*.nc')
 
 #Files to merge                    
-files_to_merge1=glob.glob(files_1_string)
+files_all=glob.glob(files_hist)
 
 #Future
 if bias_corr=="CCAM":
-    files_2_string=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
+    files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
                     '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
                     'latest/day/' + variable + '/*2006*.nc')
 else:
-    files_2_string=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
+    files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
                        '/r1i1p1/' + ccam_add + 'r240x120-' + bias_corr + 
                        '-AWAP/latest/day/' + variable + '/*2006*.nc')
 
-files_to_merge2=glob.glob(files_2_string)
+files_to_merge_fut=glob.glob(files_fut)
 
-files_to_merge1.extend(files_to_merge2)
+files_all.extend(files_to_merge_fut)
 
 
 ### Create temporary directory ###
@@ -137,67 +136,129 @@ os.system("mkdir -p " + scratch_path + "/monthly_sums/")
 
 
 ### Location of output file ###
-files= str(scratch_path + "/monthly_sums/" + bias_corr + "_" + 
-           model + "_" + scenario + "_" + variable + ".nc")
+merged_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + 
+                  model + "_" + scenario + "_" + variable + ".nc")
 
 
 #Some duplicate time steps, need to skip these when merging
-os.system("export SKIP_SAME_TIME=1")
+#os.system("export SKIP_SAME_TIME=1")
 
 
 #If output file doesn't alreade exist, create it. Else skip 
-if not os.path.isfile(files):
+if not os.path.isfile(merged_file):
 
-    for file_ms in range(len(files_to_merge1)):
     
-        ### Calculate monthly sums ###
-        os.system("cdo monsum " + files_to_merge1[file_ms] + " " + temp_dir_path + "/" + 
-              variable + "_" + str(file_ms) + ".nc")
-
+    temp_file=str(temp_dir_path + "/temp_" + variable + "_file.nc")
+    
+    files_merge=" ".join(files_all)
     ### Merge the monthly sum data ###
-    os.system("cdo mergetime " + temp_dir_path + "/" + variable + "*.nc " + scratch_path 
-              + "/monthly_sums/"+ bias_corr + "_" + model + "_" + scenario + "_" + variable + ".nc")
+    os.system("cdo mergetime " + files_merge + " " + temp_file)
+    
+    #Calculate monthly mean/sum
+    #Average for soil moisture, otherwise sum
+    if variable == "s0" :
+        os.system("cdo monmean " + temp_file + " " + merged_file)
+    else:
+        os.system("cdo monsum " + temp_file + " " + merged_file)
+    
+    #Remove temp file
+    os.system("rm " + temp_file)
+
+
+    # ds = xr.open_mfdataset(files_all)
+    # 
+    # #test=ds['s0'].groupby("time.month").sum()
+    # test1=ds['s0'].resample(time="1MS").mean(dim="time")
+    # 
+    # #Rename data variable
+    # test1.name = variable
+    # 
+    # #Write to file
+    # test1.to_netcdf(merged_file, format='NETCDF4', 
+    #                encoding={variable:{
+    #                          'shuffle':True,
+    #                          'chunksizes':[12, 681, 40],
+    #                          'zlib':True,
+    #                          'complevel':5}
+    #                          })
 
 
 
 
-### Get ss data to add to s0 ###
+    # #Soil moisture
+    # if variable == "sm" :
+    # 
+    #     monthly_s0 = 
+    # 
+    # 
+    #     #Need to sum s0, ss and sd to get total soil moisture 
+    #     extra_vars = ["ss", "sd"]
+    # 
+    #     if bias_corr=="CCAM":
+    #         add="ISIMIP2b"
+    #     else:
+    #         add = bias_corr
+    # 
+    #     for s in range(len(extra_vars)):
+    # 
+    #         #file name (leave unfinished to complete below as also need to use it flexibly
+    #         #when reading data back in)
+    #         sm_out_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
+    #                           scenario + "_")
+            
 
+
+
+
+
+### Get total soil moisture ###
+
+#Need to also get ss (shallow soil, 10-100cm) and sd (deep soil (100-600cm))
 if variable=="s0":
 
-    ### Location of output file ###
-    xtr_files = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
-                    scenario + "_ss.nc")
-
-    #If output doesn't already exist, create it
-    if not os.path.isfile(xtr_files):
-
-        ### Define file locations ###
+    extra_vars = ["ss", "sd"]
     
-        if bias_corr=="CCAM":
-            add="ISIMIP2b"
-        else:
-            add = bias_corr
+    if bias_corr=="CCAM":
+        add="ISIMIP2b"
+    else:
+        add = bias_corr
+
+    for s in range(len(extra_vars)):
+        
+        #file name (leave unfinished to complete below as also need to use it flexibly
+        #when reading data back in)
+        sm_out_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
+                          scenario + "_")
+        
+
+        #If output doesn't already exist, create it
+        if not os.path.isfile(str(sm_out_file + extra_vars[s] + ".nc")):
+
+            ### Define file locations ###
+            sm_files=glob.glob(str(data_path_var + '/' + awra_add + model + '/historical/' + 
+                                        '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
+                                        'latest/day/' + extra_vars[s] + '/*1960*.nc'))
+
+            sm_files_fut=glob.glob(str(data_path_var + '/' + awra_add + model + '/' + scenario + 
+                                              '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
+                                              'latest/day/' + extra_vars[s] + '/*2006*.nc'))
+
+            sm_files.extend(sm_files_fut)
+        
+        
+        
+            temp_sm_file=str(temp_dir_path + "/temp_" + extra_vars[s] + "_file.nc")
             
-        xtr1_files_to_merge=glob.glob(str(data_path_var + '/' + awra_add + model + '/' + scenario + 
-                                          '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
-                                          'latest/day/ss/*2006*.nc'))
+            files_sm_merge=" ".join(sm_files)
 
-        xtr2_files_to_merge=glob.glob(str(data_path_var + '/' + awra_add + model + '/historical/' + 
-                                          '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
-                                          'latest/day/ss/*1960*.nc'))
+            ### Merge the monthly sum data ###
+            os.system("cdo mergetime " + files_sm_merge + " " + temp_sm_file)
+            
+            #Take monthly mean
+            os.system("cdo monmean " + temp_sm_file + " " + str(sm_out_file + extra_vars[s] + ".nc"))
 
-        xtr1_files_to_merge.extend(xtr2_files_to_merge)
-    
-        for file_ms in range(len(xtr1_files_to_merge)):
-
-            ### Calculate monthly sums ###
-            os.system("cdo monsum " + xtr1_files_to_merge[file_ms] + " " + temp_dir_path +
-                      "/ss_" + str(file_ms) + ".nc")
-
-        ### Merge monthly sum files ###
-        os.system("cdo mergetime " + temp_dir_path + "/ss_*.nc " + scratch_path +
-                  "/monthly_sums/" + bias_corr + "_" + model + "_" + scenario + "_ss.nc")
+            #Remove temp file
+            os.system("rm " + temp_sm_file)
 
 
 ### Delete temporary directory ###
@@ -210,13 +271,21 @@ if variable=="s0":
 #Model data
 if variable == "s0":
 
-    fh        = Dataset(files, mode='r')
-    ds_ss     = Dataset(xtr_files, mode='r')
+    #s0 data (surface)
+    fh        = Dataset(merged_file, mode='r')
     s0_data   = fh.variables["s0"][:]
-   
+
+    #ss data (shallow)
+    ds_ss     = Dataset(str(sm_out_file + "ss.nc"), mode='r')
     ss_data   = ds_ss.variables["ss"][:]
 
-    all_data  = s0_data.data + ss_data.data
+    #sd data (deep)
+    ds_sd     = Dataset(str(sm_out_file + "sd.nc"), mode='r')
+    sd_data   = ds_sd.variables["sd"][:]
+    
+    #Sum s0, ss and sd to get total soil moisture
+    all_data  = s0_data.data + ss_data.data + sd_data.data
+    
     
     data      = all_data
     fh_time   = fh.variables["time"]
@@ -225,7 +294,7 @@ if variable == "s0":
 
 else:
     
-    fh       = Dataset(files, mode='r')
+    fh       = Dataset(merged_file, mode='r')
     all_data = fh.variables[variable][:] #[yr_ind]
     
     data     = all_data.data 

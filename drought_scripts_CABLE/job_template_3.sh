@@ -12,7 +12,7 @@
 module use /g/data/hh5/public/modules
 module load conda/analysis3
 
-python3 /g/data/oq98/amu561/Steven_CABLE_runs/scripts/drought_scripts_CABLE/template_drought_metric_complete_3_month.py \
+python3 /g/data/oq98/amu561/CABLE_AWRA_comparison/scripts/drought_scripts_CABLE/template_drought_metric_complete_3_month.py \
 $scenario $model $variable $co2 $out_file $scale
 
 #"MODEL" "VARIABLE" "CO2" "OUTFILE"

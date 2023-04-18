@@ -6,6 +6,9 @@ library(maps)
 #clear R environment
 rm(list=ls(all=TRUE))
 
+## NEED TO CHANGE FILE PATH
+#AND ADD CHECK THAT SAME MODELS INCLUDED IN HIST AND FUTURE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 #Set path
 path <- "/g/data/w97/amu561/CABLE_AWRA_comparison/"
@@ -38,7 +41,8 @@ vars <- names(vars_all)
 #                 sm   = "Soil moisture") #labels for plotting
 
 
-datasets <- c("CMIP6", "BARPA", "CABLE", "AWRA")
+datasets <- c("CMIP6", "BARPA", "AWRA" )#CABLE", "AWRA")!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+datasets <- c("BARPA", "AWRA" )#CABLE", "AWRA")!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 #List metrics
@@ -59,8 +63,8 @@ dir.create(outdir)
 #Historical mean
 cols_hist <- colorRampPalette(c("#ffffe5", "#fee391",
                                          "#fe9929", "#cc4c02"))
-                                         
 
+   
 #Future difference
 col_opts <- rev(brewer.pal(11, 'RdYlBu'))
 #col_opts[6] <- "grey80"
@@ -108,6 +112,7 @@ for (m in 1:length(metrics)) {
   #Loop through variables
   for (v in 1:length(vars)) {
     
+    print(paste0("Plotting variable: ", vars[v], ", metric ", m, "/", length(metrics)))
     
     ### Set up figure ###
     png(paste0(outdir, "/FigureX", "_ensemble_changes_in_", metrics[m], "_",
@@ -118,59 +123,115 @@ for (m in 1:length(metrics)) {
     par(mai=c(0.1, 0.1, 0.2, 0.1))
     par(omi=c(0.1, 0.3, 0.4, 0.1))
     
-    layout(matrix(c(1:3, 4, 4, 4, 5:7, 8, 8, 8), nrow=4, byrow=TRUE), heights=c(1, 0.3, 1, 0.3,
-                                                                                1, 0.3, 1, 0.3,
-                                                                                1, 0.3, 1, 0.3))
+    # layout(matrix(c(1:3, 4, 4, 4, 5:7, 8, 8, 8), nrow=4, byrow=TRUE), heights=c(1, 0.3, 1, 0.3,
+    #                                                                             1, 0.3, 1, 0.3,
+    #                                                                             1, 0.3, 1, 0.3))
+    # 
     
-    
-    #par(mfcol=c(3, 3))
+    par(mfrow=c(3, 3))
     par(bty="n")
     
     
     #####################
     ### Read datasets ###
     #####################
- 
-    plot_data_hist <- list()
-    plot_data_fut  <- list()
 
-    
+    #Loop through datasets    
     for (d in 1:length(datasets)) {
       
       
-      plot_data_hist[[datasets[d]]] <- brick()
-      plot_data_fut[[datasets[d]]] <- lapply(envelopes, function(x) brick())
+      plot_data_hist <- brick()
+      plot_data_fut <- lapply(envelopes, function(x) brick())
 
       
       #Find models (use historical to find them, only want to include models that have historical data)
       #should be all of them but just in case
-      models <- list.files(paste0(path, "/Mean_drought_metrics_old_delete/", datasets[d], 
+      #For AWRA/CABLE this finds the bc methods, doesn't matter for processing
+      models <- list.files(paste0(path, "/Mean_drought_metrics/", datasets[d], 
                                        "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
                                        "/", metrics[m], "/historical/"))
       
       
       for (mod in 1:length(models)) {
         
-        mod_path <-  paste0(path, "/Mean_drought_metrics_old_delete/", datasets[d], 
+        mod_path <-  paste0(path, "/Mean_drought_metrics/", datasets[d], 
                             "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
                             "/", metrics[m])
         
 
 
+        ##################
+        ### AWRA/CABLE ###
+        ##################
         
         
         #Have bc methods in addition to GCMs
         if (datasets[d] %in% c("AWRA", "CABLE")) {
           
-          #Find BC methods
-          bc_methods <- 
+          #models correspond to BC methods here. Find GCMs to loop through
+          gcms <- list.files(paste0(mod_path, "/historical/", models[mod]))
+            
+            
+          #Initialise
+          all_hist <- brick()
+          all_fut  <- lapply(envelopes, function(x) brick())
+          
+          #Loop through ensembles
+          for (gc in 1:length(gcms)) {
+
+            #Find historical file
+            hist_file <- list.files(paste0(mod_path, "/historical/", models[mod], "/",
+                                           gcms[gc]), pattern=".nc", full.names=TRUE)
+            
+            #Should only find one file, check
+            if (length(hist_file) != 1) stop("wrong CABLE/AWRA historical file")
+            
+            #Read data
+            all_hist <- addLayer(all_hist, raster(hist_file))
+            
+            
+            ### Future data ##
+            
+            for(gw in 1:length(envelopes)) {
+              
+              #1 degree of warming
+              files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
+                                             gcms[gc]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
+              
+              #Check that found files, some GW levels don't have any
+              if (length(files_deg) > 0) {
+                
+                #Read future data and calculate difference to historical
+                data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
+                
+                all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                
+              }
+              
+            }
+
+          } #GCMs            
+            
+            
+          #Calculate median of ensemble members and resample to a common resolution
+          ens_median_hist <- calc(all_hist, median)
+          ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) calc(x, median))
+          
+          
+          #Collate
+          plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
+          
+          plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
+                                                                        addLayer(plot_data_fut[[x]],
+                                                                        ens_median_fut[[x]])
+                                                                        else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
           
           
         ##################
         ### CMIP6 data ###
         ##################
           
-        } else if (datasets[d] == "CMIP6") {
+        } else if (datasets[d] %in% c("CMIP6", "BARPA")) {
           
           #Find ensembles
           ensembles <- list.files(paste0(mod_path, "/historical/", models[mod]))
@@ -218,299 +279,112 @@ for (m in 1:length(metrics)) {
           
           #Calculate median of ensemble members and resample to a common resolution
           ens_median_hist <- resample(calc(all_hist, median), res_raster)
-          ens_median_fut  <- lapply(all_fut, function(x) resample(calc(x, median), res_raster))
-                                    
+          ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) resample(calc(x, median), res_raster))
+                
           
-          plot_data_hist[[datasets[d]]] <- addLayer(plot_data_hist[[datasets[d]]], ens_median_hist)
+          #Collate
+          plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
 
-          plot_data_fut[[datasets[d]]] <- lapply(envelopes, function(x) addLayer(plot_data_fut[[datasets[d]]][[x]],
-                                                                                 ens_median_fut[[x]]))
+          plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
+                                                                           addLayer(plot_data_fut[[x]],
+                                                                                 ens_median_fut[[x]])
+                                                 else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
           
-        } #CMIP6
+          #save model names
+          
+          
+        } #CMIP6/BARPA
         
         
         
-        ## BARPA ###
+      } #models
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      ################
+      ### Plotting ###
+      ################
+      
+      
+      ### Historical median ###
+      
+      hist_median <- calc(plot_data_hist, median)
+      
+      #Plot
+      len <- length(lims_hist[[vars[v]]][[metrics[m]]])
+      image(hist_median, breaks=lims_hist[[vars[v]]][[metrics[m]]], 
+            col=c(cols_hist(len-1)),
+            axes=FALSE, ann=FALSE, asp=1)
+      
+      #Australia outline
+      map(region="Australia", add=TRUE, lwd=0.7) #border="grey50"
+      
+      
+      #time period label
+      if (d == 1) mtext(side=3, "Historical mean")
         
-
+      #dataset label
+      mtext(side=2, datasets[d])
+      
+      
+      
+      
+      ### Future difference ###
+      
+      for (env in 1:length(envelopes)) {
+        
+        #calculate future difference by model and then take median
+        fut_median <- calc(plot_data_fut[[env]], fun=median)
+        
+        
+        #Plot
+        len <- length(lims_diff[[metrics[m]]])
+        image(fut_median, breaks=lims_diff[[metrics[m]]], 
+              col=c(cols_diff(len-1)),
+              axes=FALSE, ann=FALSE, asp=1)
+        
+        #Australia outline
+        map(region="Australia", add=TRUE, lwd=0.7) #border="grey50"
+        
+        
+        #time period label
+        if (d == 1) mtext(side=3, paste0(env, " degree"))
+        
+        
+        
+        
         
       }
+        
       
       
       
-      
-      
-      
+        
+    } #datasets
+    
    
-      
-      
-      #Need to deal with multiple ensemble members
-      
-      
-      
-      
-      
-      
-    }
-    
-    
-    
-    if (metrics[m] == "timing") {
-      
-      ############
-      ### AWRA ###
-      ############
-      
-      
-      data_files_awra <- list.files(paste0(path, "/drought_metrics/", 
-                                           scale, "-month/MRNBC/"),
-                                    pattern=glob2rx(paste0("drought_metrics_*", vars[v], "*rcp45*.nc")),
-                                    full.names=TRUE, recursive=TRUE)
-      
-      #CO2
-      data_files_CO2  <- list.files(paste0(path, "/drought_metrics_CABLE/", 
-                                           scale, "-month/CO2/"),
-                                    pattern=glob2rx(paste0("drought_metrics_CABLE_CO2_*", vars[v], 
-                                                           ".nc")),
-                                    full.names=TRUE, recursive=TRUE)
-      
-      
-      #noCO2
-      data_files_noCO2  <- list.files(paste0(path, "/drought_metrics_CABLE/", 
-                                             scale, "-month/noCO2/"),
-                                      pattern=glob2rx(paste0("drought_metrics_CABLE_noCO2_*", vars[v], 
-                                                             ".nc")),
-                                      full.names=TRUE, recursive=TRUE)
-      
-      
-      #Check number of files
-      if (any (c(length(data_files_noCO2), length(data_files_CO2), length(data_files_awra)) != 4)){
-        stop("Wrong number of files")
-      }
-      
-      
-      #Load data
-      data_awra   <- lapply(data_files_awra, brick, varname=metrics[m])
-      data_CO2    <- lapply(data_files_CO2, brick, varname=metrics[m])
-      data_noCO2  <- lapply(data_files_noCO2, brick, varname=metrics[m])
-      
-      #Calculate historical and future mean
-      
-      #First get date indices so that use 1970-2005 for historical
-      #and 2064-2099 for future
-      
-      dates <- getZ(data_awra[[1]])
-      
-      start_hist <- which(dates  == "1970-01-16")
-      end_hist <- which(dates  == "2005-12-16")
-      
-      len_time <- length(start_hist:end_hist)
-      
-      start_rcp45 <- which(dates  == "2064-01-16")
-      end_rcp45 <- which(dates  == "2099-12-16")
-      
-      
-      #Historical mean (percentage of time in drought)
-      data_hist_awra   <- brick(lapply(data_awra, function(x) sum(x[[start_hist:end_hist]], na.rm=TRUE) / len_time * 100))
-      data_hist_CO2    <- brick(lapply(data_CO2, function(x) sum(x[[start_hist:end_hist]], na.rm=TRUE) / len_time * 100))
-      data_hist_noCO2  <- brick(lapply(data_noCO2, function(x) sum(x[[start_hist:end_hist]], na.rm=TRUE) / len_time * 100))
-      
-      #Future mean
-      data_rcp45_awra  <- brick(lapply(data_awra, function(x) sum(x[[start_rcp45:end_rcp45]], na.rm=TRUE) / len_time * 100))
-      data_rcp45_CO2   <- brick(lapply(data_CO2, function(x) sum(x[[start_rcp45:end_rcp45]], na.rm=TRUE) / len_time * 100))
-      data_rcp45_noCO2 <- brick(lapply(data_noCO2, function(x) sum(x[[start_rcp45:end_rcp45]], na.rm=TRUE) / len_time * 100))
-      
-      
-    } else {
-      
-      
-      ############
-      ### AWRA ###
-      ############
-      
-      
-      data_files_hist_awra <- list.files(paste0(path, "/Mean_drought_metrics/scale_", 
-                                                scale, "/historical/", vars[v], "/MRNBC/"),
-                                         pattern=paste0("Mean_", metrics[m]),
-                                         full.names=TRUE, recursive=TRUE)
-      
-      #Read datasets
-      data_files_rcp45_awra <- list.files(paste0(path, "/Mean_drought_metrics/scale_", 
-                                                 scale, "/rcp45/", vars[v],"/MRNBC/"),
-                                          pattern=paste0("Mean_", metrics[m]),
-                                          full.names=TRUE, recursive=TRUE)
-      
-      #Check number of files
-      if (any (c(length(data_files_hist_awra), length(data_files_rcp45_awra)) != 4)){
-        stop("Wrong number of CO2 files")
-      }
-      
-      #CO2
-      data_files_hist_CO2  <- list.files(paste0(path, "/Mean_drought_metrics_CABLE/scale_", 
-                                                scale, "/", vars[v], "/CO2/"),
-                                         pattern=glob2rx(paste0("Mean_CABLE_", metrics[m], 
-                                                                "*_CO2_*_historical_*.nc")),
-                                         full.names=TRUE, recursive=TRUE)
-      
-      data_files_rcp45_CO2 <- list.files(paste0(path, "/Mean_drought_metrics_CABLE/scale_", 
-                                                scale, "/", vars[v], "/CO2/"),
-                                         pattern=glob2rx(paste0("Mean_CABLE_", metrics[m], 
-                                                                "*_CO2_*_rcp45_*.nc")),
-                                         full.names=TRUE, recursive=TRUE)
-      
-      #Check number of files
-      if (any (c(length(data_files_hist_CO2), length(data_files_rcp45_CO2)) != 4)){
-        stop("Wrong number of CO2 files")
-      }
-      
-      
-      #noCO2
-      data_files_hist_noCO2  <- list.files(paste0(path, "/Mean_drought_metrics_CABLE/scale_", 
-                                                  scale, "/", vars[v], "/noCO2/"),
-                                           pattern=glob2rx(paste0("Mean_CABLE_", metrics[m], 
-                                                                  "*_noCO2_*_historical_*.nc")),
-                                           full.names=TRUE, recursive=TRUE)
-      
-      data_files_rcp45_noCO2 <- list.files(paste0(path, "/Mean_drought_metrics_CABLE/scale_", 
-                                                  scale, "/", vars[v], "/noCO2/"),
-                                           pattern=glob2rx(paste0("Mean_CABLE_", metrics[m], 
-                                                                  "*_noCO2_*_rcp45_*.nc")),
-                                           full.names=TRUE, recursive=TRUE)
-      
-      #Check number of files
-      if (any (c(length(data_files_hist_noCO2), length(data_files_rcp45_noCO2)) != 4)){
-        stop("Wrong number of CO2 files")
-      }
-      
-      
-      #Load data
-      data_hist_awra    <- brick(lapply(data_files_hist_awra, raster))
-      data_hist_CO2     <- brick(lapply(data_files_hist_CO2, raster))
-      data_hist_noCO2   <- brick(lapply(data_files_hist_noCO2, raster))
-      
-      data_rcp45_awra   <- brick(lapply(data_files_rcp45_awra, raster))
-      data_rcp45_CO2    <- brick(lapply(data_files_rcp45_CO2, raster))
-      data_rcp45_noCO2  <- brick(lapply(data_files_rcp45_noCO2, raster))
-      
-    }
-    
-    
-    
-    #Calculate future change
-    future_diff_rcp45_awra   <- data_rcp45_awra - data_hist_awra
-    future_diff_rcp45_CO2    <- data_rcp45_CO2 - data_hist_CO2
-    future_diff_rcp45_noCO2  <- data_rcp45_noCO2 - data_hist_noCO2
-    
-    #Calculate ensemble median change
-    ens_median_awra  <- calc(future_diff_rcp45_awra, median)
-    ens_median_CO2   <- calc(future_diff_rcp45_CO2, median)
-    ens_median_noCO2 <- calc(future_diff_rcp45_noCO2, median)
-    
-    
-    
-    ################
-    ### Plotting ###
-    ################
-    
-    
-    ### Ensemble median future change ###
-    
-    plot_data <- list(awra  = ens_median_awra,
-                      CO2   = ens_median_CO2,
-                      noCO2 = ens_median_noCO2)
-    
-    
-    labs_mod <- c("AWRA", "CABLE CO2", "CABLE noCO2")   
-    
-    
-    #Loop through experiments
-    for (p in 1:length(plot_data)) {
-      
-      
-      #Plot
-      len <- length(lims_diff[[metrics[m]]])
-      image(plot_data[[p]], breaks=lims_diff[[metrics[m]]], 
-            col=c(cols_diff(len-1)),
-            axes=FALSE, ann=FALSE, asp=1)
-      
-      
-      #Australia outline
-      map(region="Australia", add=TRUE, lwd=0.7) #border="grey50"
-      
-      
-      #Model label
-      mtext(side=3, line=0, font=2, text=labs_mod[p], xpd=NA)
-      
-      
-      if (p==1) mtext(side=2, line=1, text="Ensemble median")
-      
-    }
-    
-    
-    
-    #Empty plot
      
-    plot(1, type="n", bty="n", yaxt="n", xaxt="n")
+
     
-    #Legend
-    len1 <- length(lims_diff[[metrics[m]]])-1
-    add_raster_legend2(cols=cols_diff(len1), limits=lims_diff[[metrics[m]]][2:len1],
-                       main_title=unit[m], plot_loc=c(0.3,0.7,0.63, 0.77), 
-                       title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
+    # #Empty plot
+    #  
+    # plot(1, type="n", bty="n", yaxt="n", xaxt="n")
+    # 
+    # #Legend
+    # len1 <- length(lims_diff[[metrics[m]]])-1
+    # add_raster_legend2(cols=cols_diff(len1), limits=lims_diff[[metrics[m]]][2:len1],
+    #                    main_title=unit[m], plot_loc=c(0.3,0.7,0.63, 0.77), 
+    #                    title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
+    # 
+    
   
-    
-
-    
-    ### Model differences ###
-
-    plot_data <- list(awra_CO2   = ens_median_awra - ens_median_CO2, #(ens_median_awra - ens_median_CO2) / ens_median_CO2 *100,
-                      awra_noCO2 = ens_median_awra - ens_median_noCO2,
-                      CO2_noCO2  = ens_median_noCO2 - ens_median_CO2)
-    
-    
-    labs <- c("AWRA - CO2", "AWRA - noCO2", "noCO2 - CO2")
-    
-    cols <- colorRampPalette(rev(c("#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", 
-                               "#c7eae5", "#80cdc1", "#35978f", "#01665e")))
-    
-    #Loop through experiments
-    for (p in 1:length(plot_data)) {
-      
-      
-      #Plot
-      len <- length(lims_diff[[metrics[m]]])
-      image(plot_data[[p]], breaks=lims_diff[[metrics[m]]], 
-            col=c(cols(len-1)),
-            axes=FALSE, ann=FALSE, asp=1)
-      
-      
-      #Australia outline
-      map(region="Australia", add=TRUE, lwd=0.7) #border="grey50"
-      
-      
-      #Model label
-      mtext(side=3, line=0, font=2, text=labs[p], xpd=NA)
-      
-      
-      if (p==1) mtext(side=2, line=1, text="Difference")
-      
-      
-    }
-    
-    
-    ### Legend ###
-    
-    #Empty plot
-    plot(1, type="n", bty="n", yaxt="n", xaxt="n")
-    
-    #Legend
-    len1 <- length(lims_diff[[metrics[m]]])-1
-    add_raster_legend2(cols=cols(len1), limits=lims_diff[[metrics[m]]][2:len1],
-                       main_title=unit[m], plot_loc=c(0.3,0.7,0.63, 0.77), 
-                       title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
-  
-
-
     dev.off ()
     
   } #metrics

@@ -103,17 +103,7 @@ for (exp in 1:length(experiments)) {
           start_ind <- which(years == hist_ref[1])[1]
           end_ind   <- tail(which(years == hist_ref[2]), n=1)
           
-          if (metrics[[m]] == "timing") {
-            
-            #Calculate time under drought (in %)
-            hist_mean <- clusterR(data[[start_ind:end_ind]], calc, args=list(fun=freq))
-            
-          } else {
-            #Take mean of the metric
-            hist_mean <- clusterR(data[[start_ind : end_ind]], mean, args=list(na.rm=TRUE)) #mean(data[[start_ind : end_ind]], na.rm=TRUE)
-          }
-  
-         
+          
           #Save historical data
           outdir_hist <- paste0(outdir_mod, "/historical/", bc_methods[bc], "/", gcms[g])
           
@@ -122,10 +112,27 @@ for (exp in 1:length(experiments)) {
           hist_outfile <- paste0(outdir_hist, "/Historical_mean_", variables[v], "_",
                                  names(metrics)[m], "_", bc_methods[bc], "_", gcms[g], ".nc")
           
-          writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
-                      longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
           
-          
+          if (!file.exists(hist_outfile)) {
+            
+            if (metrics[[m]] == "timing") {
+              
+              #Calculate time under drought (in %)
+              hist_mean <- clusterR(data[[start_ind:end_ind]], calc, args=list(fun=freq))
+              
+            } else {
+              #Take mean of the metric
+              hist_mean <- clusterR(data[[start_ind : end_ind]], mean, args=list(na.rm=TRUE)) #mean(data[[start_ind : end_ind]], na.rm=TRUE)
+            }
+            
+            writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
+                        longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+            
+            
+          } else {
+            hist_mean <- raster(hist_outfile)
+          }
+           
           ###################
           ### Future data ###
           ###################
@@ -278,6 +285,8 @@ for (exp in 1:length(experiments)) {
             
             writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
                         longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+          } else {
+            hist_mean <- raster(hist_outfile)
           }
 
           

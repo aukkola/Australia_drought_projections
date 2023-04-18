@@ -99,6 +99,23 @@ for (d in 1:length(dataset)) {
                                  "/", names(metrics)[m], "/") 
             
             
+            
+            #First of all check that have global warming levels available. Some
+            #ensemble members don't seem to have tas data available
+            gw_file <- list.files(paste0(path, "/Global_warming_levels/",
+                                         dataset[d], "/baseline_1970_2005/", 
+                                         experiments[exp], "/", gcms[g], "/", 
+                                         ensembles[ens]), pattern=".rds", full.names=TRUE)
+            
+            if(length(gw_file) == 0) {
+              print(paste0("Skipping ", outdir_mod, ", no GW levels available"))
+              next
+            }
+            
+            #Read index file for global warming levels
+            gw_indices <- readRDS(gw_file)
+            
+            
             ##################
             ### Historical ###
             ##################
@@ -123,6 +140,7 @@ for (d in 1:length(dataset)) {
                                    names(metrics)[m], "_", gcms[g], "_", ensembles[ens], "_",
                                    experiments[exp], ".nc")
             
+            print(paste0("processing: ", hist_outfile))
             
             if (!file.exists(hist_outfile)) {
               
@@ -144,6 +162,9 @@ for (d in 1:length(dataset)) {
               #Write output            
               writeRaster(hist_mean, hist_outfile, overwrite=TRUE, varname=names(metrics)[m],
                           longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
+              
+            } else {
+              hist_mean <- raster(hist_outfile)
             }
               
             
@@ -166,13 +187,7 @@ for (d in 1:length(dataset)) {
             
             
             
-            #Read index file for global warming levels
-            gw_indices <- readRDS(list.files(paste0(path, "/Global_warming_levels/",
-                                                    dataset[d], "/baseline_1970_2005/", 
-                                                    experiments[exp], "/", gcms[g], "/", 
-                                                    ensembles[ens]), pattern=".rds", full.names=TRUE))
-            
-            #Loop through global warming levels
+             #Loop through global warming levels
             for (w in 1:length(warming_levels)) {
               
               #Get indices for this warming level
@@ -206,12 +221,12 @@ for (d in 1:length(dataset)) {
                 writeRaster(fut_mean, fut_outfile, overwrite=TRUE, varname=names(metrics)[m],
                             longname=paste0("mean ", names(metrics)[m]), varunit=units[[m]])
                 
-                end=Sys.time()
                 
-                print(end-start)
               }
               
-               
+              end=Sys.time()
+              print(end-start)
+              
             } #GW levels
           } #metrics
         } #ensembles
