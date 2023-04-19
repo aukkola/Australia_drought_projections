@@ -31,7 +31,7 @@ envelopes =c(1,2)
 
 #Variables
 vars_all <- list(pr   = list(CMIP6 = "pr", BARPA = "pr", AWRA = "pr"),
-                 qtot = list(CMIP6 = "mrro", BARPA = "mrro", AWRA = "qtot"),
+                 qtot = list(CMIP6 = "mrro", BARPA = "mrro", AWRA = "qtot", CABLE="qtot"),
                  sm   = list(CMIP6 = "mrsol_std_3m", BARPA = "mrso", AWRA = "sm"))
              
 vars <- names(vars_all)
@@ -41,8 +41,7 @@ vars <- names(vars_all)
 #                 sm   = "Soil moisture") #labels for plotting
 
 
-datasets <- c("CMIP6", "BARPA", "AWRA" )#CABLE", "AWRA")!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-datasets <- c("BARPA", "AWRA" )#CABLE", "AWRA")!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+datasets <- c("CMIP6", "BARPA", "CABLE", "AWRA" )
 
 
 #List metrics
@@ -103,6 +102,8 @@ panel_cex=0.7
 #Create a 1 x 1 deg raster for this
 res_raster <- raster(ext=extent(c(112.5, 153.75, -43.75, -10)), resolution=1)
 
+#Create folder to save plot data
+plot_data_dir <- paste0(path, "/Plot_data/")
 
 
 #Loop through metrics
@@ -112,23 +113,32 @@ for (m in 1:length(metrics)) {
   #Loop through variables
   for (v in 1:length(vars)) {
     
-    print(paste0("Plotting variable: ", vars[v], ", metric ", m, "/", length(metrics)))
+    #One fewer variable for precip, set lower plot height    
+    if (vars[v] == "pr") {
+      height=8
+    } else {
+      height=10
+    }
     
     ### Set up figure ###
     png(paste0(outdir, "/FigureX", "_ensemble_changes_in_", metrics[m], "_",
                percentile, "_", scale, "_", vars[v], ".png"),
-        height=7, width=8.3, units="in", res=400)
+        height=height, width=8.3, units="in", res=400)
     
     
     par(mai=c(0.1, 0.1, 0.2, 0.1))
     par(omi=c(0.1, 0.3, 0.4, 0.1))
     
-    # layout(matrix(c(1:3, 4, 4, 4, 5:7, 8, 8, 8), nrow=4, byrow=TRUE), heights=c(1, 0.3, 1, 0.3,
-    #                                                                             1, 0.3, 1, 0.3,
-    #                                                                             1, 0.3, 1, 0.3))
-    # 
     
-    par(mfrow=c(3, 3))
+    #One fewer dataset for precip
+    if (vars[v] == "pr") {
+      layout(matrix(c(1:9, 10, 11, 11), nrow=4, byrow=TRUE), heights=c(rep(1,3), 0.3) )
+    } else {
+      layout(matrix(c(1:12, 13, 14, 14), nrow=5, byrow=TRUE), heights=c(rep(1,4 ), 0.3) )
+    }
+    
+    
+    #par(mfrow=c(3, 3))
     par(bty="n")
     
     
@@ -140,6 +150,15 @@ for (m in 1:length(metrics)) {
     for (d in 1:length(datasets)) {
       
       
+      #Skip CABLE if rainfall
+      if (vars[v] == "pr" & datasets[d] == "CABLE") next
+      
+      #Progress
+      print(paste0("Plotting variable: ", vars[v], ", metric ", m, "/", length(metrics),
+                   ", dataset ", d, "/", length(datasets)))
+      
+      
+      
       plot_data_hist <- brick()
       plot_data_fut <- lapply(envelopes, function(x) brick())
 
@@ -147,175 +166,255 @@ for (m in 1:length(metrics)) {
       #Find models (use historical to find them, only want to include models that have historical data)
       #should be all of them but just in case
       #For AWRA/CABLE this finds the bc methods, doesn't matter for processing
-      models <- list.files(paste0(path, "/Mean_drought_metrics/", datasets[d], 
-                                       "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
-                                       "/", metrics[m], "/historical/"))
+      model_path <- paste0(path, "/Mean_drought_metrics/", datasets[d], 
+                           "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
+                           "/", metrics[m], "/historical/")
+      
+      if (datasets[d] == "CABLE") model_path <- paste0(model_path, "/CO2/")
+      models <- list.files(model_path)
       
       
-      for (mod in 1:length(models)) {
+      
+      #Save data for faster processing
+      dataset_dir <- paste0(plot_data_dir, "/", datasets[d], "/", vars[v], "/", metrics[m])
+      dir.create(dataset_dir, recursive=TRUE)
+      
+      hist_out_file <- paste0(dataset_dir, "/historical_data_", datasets[d], "_",
+                          vars[v], "_", metrics[m], ".nc")
+      
+      fut_out_files <- lapply(envelopes,  function(x) paste0(dataset_dir, "/", x, "deg_data_", datasets[d], "_",
+                                             vars[v], "_", metrics[m], ".nc"))
+      
+      #model name files
+      mod_name_hist_file <-paste0(dataset_dir, "/historical_mod_names_", datasets[d], "_",
+                                  vars[v], "_", metrics[m], ".csv")
+      mod_name_fut_file <- lapply(envelopes,  function(x) paste0(dataset_dir, "/", x, "deg_mod_names_", datasets[d], "_",
+                                                                 vars[v], "_", metrics[m], ".csv"))
+      
+      
+      #Collate model names 
+      model_names_hist <- vector()
+      model_names_fut <- lapply(envelopes, function(x) vector())
+      
+      
+      #If files don't exist, process data
+      if (any(!file.exists(c(hist_out_file, unlist(fut_out_files))))) {
         
-        mod_path <-  paste0(path, "/Mean_drought_metrics/", datasets[d], 
-                            "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
-                            "/", metrics[m])
-        
-
-
-        ##################
-        ### AWRA/CABLE ###
-        ##################
-        
-        
-        #Have bc methods in addition to GCMs
-        if (datasets[d] %in% c("AWRA", "CABLE")) {
+        for (mod in 1:length(models)) {
           
-          #models correspond to BC methods here. Find GCMs to loop through
-          gcms <- list.files(paste0(mod_path, "/historical/", models[mod]))
-            
-            
-          #Initialise
-          all_hist <- brick()
-          all_fut  <- lapply(envelopes, function(x) brick())
+          mod_path <-  paste0(path, "/Mean_drought_metrics/", datasets[d], 
+                              "/scale_", scale, "/", vars_all[[vars[v]]][[datasets[d]]], 
+                              "/", metrics[m])
           
-          #Loop through ensembles
-          for (gc in 1:length(gcms)) {
-
-            #Find historical file
-            hist_file <- list.files(paste0(mod_path, "/historical/", models[mod], "/",
-                                           gcms[gc]), pattern=".nc", full.names=TRUE)
-            
-            #Should only find one file, check
-            if (length(hist_file) != 1) stop("wrong CABLE/AWRA historical file")
-            
-            #Read data
-            all_hist <- addLayer(all_hist, raster(hist_file))
+          
+          
+          ##################
+          ### AWRA/CABLE ###
+          ##################
+          
+          
+          #Have bc methods in addition to GCMs
+          if (datasets[d] %in% c("AWRA", "CABLE")) {
             
             
-            ### Future data ##
+            #models correspond to BC methods here. Find GCMs to loop through
+            gcms <- list.files(paste0(mod_path, "/historical/", models[mod]))
             
-            for(gw in 1:length(envelopes)) {
+            
+            #Initialise
+            all_hist <- brick()
+            all_fut  <- lapply(envelopes, function(x) brick())
+            
+            #Loop through ensembles
+            for (gc in 1:length(gcms)) {
               
-              #1 degree of warming
-              files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
-                                             gcms[gc]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
+              #Find historical file
+              hist_file <- list.files(paste0(mod_path, "/historical/", models[mod], "/",
+                                             gcms[gc]), pattern=".nc", full.names=TRUE)
               
-              #Check that found files, some GW levels don't have any
-              if (length(files_deg) > 0) {
+              #Should only find one file, check
+              if (length(hist_file) != 1) stop("wrong CABLE/AWRA historical file")
+              
+              #Read data
+              all_hist <- addLayer(all_hist, raster(hist_file))
+              
+              
+              ### Future data ##
+              
+              for(gw in 1:length(envelopes)) {
                 
-                #Read future data and calculate difference to historical
-                data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
+                #1 degree of warming
+                files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
+                                               gcms[gc]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
                 
-                all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                #Check that found files, some GW levels don't have any
+                if (length(files_deg) > 0) {
+                  
+                  #Read future data and calculate difference to historical
+                  data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
+                  
+                  all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                  
+                }
                 
               }
               
+            } #GCMs            
+            
+            
+            #Calculate median of ensemble members and resample to a common resolution
+            ens_median_hist <- calc(all_hist, median)
+            ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) calc(x, median))
+            
+            
+            #Collate
+            plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
+            
+            plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
+              addLayer(plot_data_fut[[x]],
+                       ens_median_fut[[x]])
+              else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
+            
+            
+            #save model names
+            model_names_hist <- append(model_names_hist, paste0(models[mod], "/", gcms[gc]))
+            for (ii in 1:length(envelopes)) {
+              if(!is.null(ens_median_fut[[ii]])) {
+                model_names_fut[[ii]]  <- append(model_names_fut[[ii]], paste0(models[mod], "/", gcms[gc]))
+              }
             }
+              
 
-          } #GCMs            
             
             
-          #Calculate median of ensemble members and resample to a common resolution
-          ens_median_hist <- calc(all_hist, median)
-          ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) calc(x, median))
-          
-          
-          #Collate
-          plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
-          
-          plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
-                                                                        addLayer(plot_data_fut[[x]],
-                                                                        ens_median_fut[[x]])
-                                                                        else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
-          
-          
-        ##################
-        ### CMIP6 data ###
-        ##################
-          
-        } else if (datasets[d] %in% c("CMIP6", "BARPA")) {
-          
-          #Find ensembles
-          ensembles <- list.files(paste0(mod_path, "/historical/", models[mod]))
-          
-          #Initialise
-          all_hist <- brick()
-          all_fut  <- lapply(envelopes, function(x) brick())
-          
-          #Loop through ensembles
-          for (ens in 1:length(ensembles)) {
+            ##################
+            ### CMIP6 data ###
+            ##################
             
-            #Find historical file
-            hist_file <- list.files(paste0(mod_path, "/historical/", models[mod], "/",
-                                           ensembles[ens]), pattern=".nc", full.names=TRUE)
+          } else if (datasets[d] %in% c("CMIP6", "BARPA")) {
             
-            #Should only find one file, check
-            if (length(hist_file) != 1) stop("wrong CMIP6 historical file")
+            #Find ensembles
+            ensembles <- list.files(paste0(mod_path, "/historical/", models[mod]))
             
-            #Read data
-            all_hist <- addLayer(all_hist, raster(hist_file))
+            #Initialise
+            all_hist <- brick()
+            all_fut  <- lapply(envelopes, function(x) brick())
             
-            
-            ### Future data ##
-            
-            for(gw in 1:length(envelopes)) {
+            #Loop through ensembles
+            for (ens in 1:length(ensembles)) {
               
-              #1 degree of warming
-              files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
-                                             ensembles[ens]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
+              #Find historical file
+              hist_file <- list.files(paste0(mod_path, "/historical/", models[mod], "/",
+                                             ensembles[ens]), pattern=".nc", full.names=TRUE)
               
-              #Check that found files, some GW levels don't have any
-              if (length(files_deg) > 0) {
+              #Should only find one file, check
+              if (length(hist_file) != 1) stop("wrong CMIP6 historical file")
+              
+              #Read data
+              all_hist <- addLayer(all_hist, raster(hist_file))
+              
+              
+              ### Future data ##
+              
+              for(gw in 1:length(envelopes)) {
                 
-                #Read future data and calculate difference to historical
-                data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
+                #1 degree of warming
+                files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
+                                               ensembles[ens]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
                 
-                all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                #Check that found files, some GW levels don't have any
+                if (length(files_deg) > 0) {
+                  
+                  #Read future data and calculate difference to historical
+                  data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
+                  
+                  all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                  
+                }
                 
               }
-               
+              
+              
+            } #ensembles
+            
+            #Calculate median of ensemble members and resample to a common resolution
+            ens_median_hist <- resample(calc(all_hist, median), res_raster)
+            ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) resample(calc(x, median), res_raster))
+            
+            
+            #Collate
+            plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
+            
+            plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
+                                    addLayer(plot_data_fut[[x]],
+                                             ens_median_fut[[x]])
+                                    else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
+                                  
+            #save model names
+            model_names_hist <- append(model_names_hist, models[mod])
+            
+            for (ii in 1:length(envelopes)) {
+              if(!is.null(ens_median_fut[[ii]])) {
+                model_names_fut[[ii]]  <- append(model_names_fut[[ii]], models[mod])
+              }
             }
-  
+            
+            
+          } #CMIP6/BARPA
+        } #models
+        
+        
+        #Add layer names
+        names(plot_data_hist) <- model_names_hist
+        for (mm in 1:length(plot_data_fut))  names(plot_data_fut[[mm]]) <- model_names_fut[[mm]]
+        
+        
+        #Write outputs
+        writeRaster(plot_data_hist, hist_out_file, overwrite=TRUE, varname=metrics[m])
+        lapply(1:length(plot_data_fut), function(x) writeRaster(plot_data_fut[[x]], fut_out_files[[x]], 
+                                                                overwrite=TRUE, varname=metrics[m]))
+        
+        
+        #Also need to write out model names as these don't get saved into the file otherwise
+        write.csv(model_names_hist, mod_name_hist_file)
+        
+        lapply(1:length(model_names_fut), function(x) write.csv(model_names_fut[[x]], mod_name_fut_file[[x]]))
+        
+        
+      #If files already processed, read them in
+      } else {
+        
+        #Read data in
+        plot_data_hist <- brick(hist_out_file)
+        plot_data_fut  <- lapply(fut_out_files, brick)
  
-          } #ensembles
-          
-          #Calculate median of ensemble members and resample to a common resolution
-          ens_median_hist <- resample(calc(all_hist, median), res_raster)
-          ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) resample(calc(x, median), res_raster))
-                
-          
-          #Collate
-          plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
+        #Also get model names (need to grab second column as first one is just indices)
+        model_names_hist <- read.csv(mod_name_hist_file)[,2]
+        model_names_fut  <- lapply(mod_name_fut_file, function(x) read.csv(x)[,2])
 
-          plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
-                                                                           addLayer(plot_data_fut[[x]],
-                                                                                 ens_median_fut[[x]])
-                                                 else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
-          
-          #save model names
-          
-          
-        } #CMIP6/BARPA
-        
-        
-        
-      } #models
+      }
       
-      
-      
-      
-      
-      
-      
-      
+       
       
       
       ################
       ### Plotting ###
       ################
       
+      #Match models for historical and future runs
+      #First collate historical and future names
+      all_names <- model_names_fut
+      all_names[[length(all_names)+1]] <- model_names_hist
+      
+      #Then find common models
+      common_models <- Reduce(intersect, all_names) #needs capital R, found on stack overflow
+      
+      
       
       ### Historical median ###
       
-      hist_median <- calc(plot_data_hist, median)
+      #Only take common models
+      hist_median <- calc(plot_data_hist[[which(model_names_hist %in% common_models)]], median)
       
       #Plot
       len <- length(lims_hist[[vars[v]]][[metrics[m]]])
@@ -331,7 +430,7 @@ for (m in 1:length(metrics)) {
       if (d == 1) mtext(side=3, "Historical mean")
         
       #dataset label
-      mtext(side=2, datasets[d])
+      mtext(side=2, paste0(datasets[d], " (", length(common_models), ")"))
       
       
       
@@ -341,7 +440,7 @@ for (m in 1:length(metrics)) {
       for (env in 1:length(envelopes)) {
         
         #calculate future difference by model and then take median
-        fut_median <- calc(plot_data_fut[[env]], fun=median)
+        fut_median <- calc(plot_data_fut[[env]][[which(model_names_fut[[env]] %in% common_models)]], fun=median)
         
         
         #Plot
@@ -357,33 +456,38 @@ for (m in 1:length(metrics)) {
         #time period label
         if (d == 1) mtext(side=3, paste0(env, " degree"))
         
-        
-        
-        
-        
       }
-        
-      
-      
-      
-        
     } #datasets
     
    
-     
+    #Historical legend
+    
+    #Empty plot
+    plot(1, type="n", bty="n", yaxt="n", xaxt="n")
+
+    #Legend
+    len1 <- length(lims_hist[[vars[v]]][[metrics[m]]])-1
+    add_raster_legend2(cols=cols_hist(len1), limits=lims_hist[[metrics[m]]][2:len1],
+                       main_title=unit[metrics[m]], plot_loc=c(0.3,0.7,0.63, 0.77),
+                       title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
+
+
 
     
-    # #Empty plot
-    #  
-    # plot(1, type="n", bty="n", yaxt="n", xaxt="n")
-    # 
-    # #Legend
-    # len1 <- length(lims_diff[[metrics[m]]])-1
-    # add_raster_legend2(cols=cols_diff(len1), limits=lims_diff[[metrics[m]]][2:len1],
-    #                    main_title=unit[m], plot_loc=c(0.3,0.7,0.63, 0.77), 
-    #                    title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
-    # 
+    #Future legend
     
+    #Empty plot
+    plot(1, type="n", bty="n", yaxt="n", xaxt="n")
+    
+    #Legend
+    len1 <- length(lims_diff[[metrics[m]]])-1
+    add_raster_legend2(cols=cols_diff(len1), limits=lims_diff[[metrics[m]]][2:len1],
+                       main_title=unit[metrics[m]], plot_loc=c(0.3,0.7,0.63, 0.77),
+                       title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
+    
+    
+    
+ 
   
     dev.off ()
     
