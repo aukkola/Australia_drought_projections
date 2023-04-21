@@ -6,9 +6,7 @@ library(maps)
 #clear R environment
 rm(list=ls(all=TRUE))
 
-## NEED TO CHANGE FILE PATH
-#AND ADD CHECK THAT SAME MODELS INCLUDED IN HIST AND FUTURE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 #Set path
 path <- "/g/data/w97/amu561/CABLE_AWRA_comparison/"
@@ -17,6 +15,7 @@ path <- "/g/data/w97/amu561/CABLE_AWRA_comparison/"
 #Source functions
 source(paste0(path,"/scripts/R/functions/add_raster_legend.R"))
 source(paste0(path,"/scripts/R/functions/mask_data.R"))
+source(paste0(path,"/scripts/R/functions/model_agreement.R"))
 
 
 #Get world shapefile (for masking) and crop to Australia
@@ -38,7 +37,7 @@ envelopes =c(1,2)
 vars_all <- list(pr   = list(CMIP6 = "pr", BARPA = "pr", AWRA = "pr"),
                  qtot = list(CMIP6 = "mrro", BARPA = "mrro", AWRA = "qtot", CABLE="qtot"),
                  sm   = list(CMIP6 = "mrsol_std_2.89m", BARPA = "mrso", AWRA = "sm", CABLE="sm"))
-             
+
 vars <- names(vars_all)
 
 # var_labels <- c(pr   = "Precipitation", 
@@ -64,14 +63,13 @@ dir.create(outdir)
 
 #Set plot colours
 
-#Historical mean
-cols_hist <- colorRampPalette(c("#ffffe5", "#fee391",
-                                         "#fe9929", "#cc4c02"))
-
-   
 #Future difference
-col_opts <- rev(brewer.pal(11, 'RdYlBu'))
-#col_opts[6] <- "grey80"
+col_opts  <- rev(brewer.pal(8, 'RdYlBu'))
+col_opts  <- c(col_opts[1:4], "grey80", col_opts[5:8])
+
+# col_opts <- rev(c("#8c510a","#bf812d","#dfc27d","#f6e8c3",
+#                   "grey80","#c7eae5","#80cdc1","#35978f","#01665e"))
+
 cols_diff <- colorRampPalette(col_opts) 
 
 #Limits
@@ -85,9 +83,9 @@ lims_hist <- list(pr =   list(duration  = c(1, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 
                               rel_intensity = c(0, 30, 40, 50, 60, 70, 80, 90, 100),
                               time_in_drought = c(5, 10, 12, 14, 16, 18, 1000)))
 
-lims_diff <- list(duration        = c(-1000, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 1000),
-                  rel_intensity   = c(-10000, -8, -6, -4, -2, 0,  2, 4, 6, 8, 10000),
-                  time_in_drought = c(-100, -10, -8, -6 , -4, -2, 0 , 2, 4, 6, 8, 10, 100))
+lims_diff <- list(duration        = c(0, 10, 20, 30, 40, 60, 70, 80, 90, 100), #seq(0, 100, by=10),
+                  rel_intensity   = c(0, 10, 20, 30, 40, 60, 70, 80, 90, 100),#seq(0, 100, by=10),
+                  time_in_drought = c(0, 10, 20, 30, 40, 60, 70, 80, 90, 100)) #,seq(0, 100, by=10))
 
 
 unit <- c(duration        = "months", 
@@ -126,9 +124,9 @@ for (m in 1:length(metrics)) {
     }
     
     ### Set up figure ###
-    png(paste0(outdir, "/FigureX", "_ensemble_changes_in_", metrics[m], "_",
+    png(paste0(outdir, "/FigureX", "_model_agreement_on_future_changes_in_", metrics[m], "_",
                percentile, "_", scale, "_", vars[v], ".png"),
-        height=height, width=8.3, units="in", res=400)
+        height=height, width=6.3, units="in", res=400)
     
     
     par(mai=c(0.1, 0.1, 0.2, 0.1))
@@ -137,10 +135,12 @@ for (m in 1:length(metrics)) {
     
     #One fewer dataset for precip
     if (vars[v] == "pr") {
-      layout(matrix(c(1:9, 10, 11, 11), nrow=4, byrow=TRUE), heights=c(rep(1,3), 0.3) )
+      layout(matrix(c(1:6, 7, 7), nrow=4, byrow=TRUE), heights=c(rep(1,3), 0.3) )
     } else {
-      layout(matrix(c(1:12, 13, 14, 14), nrow=5, byrow=TRUE), heights=c(rep(1,4 ), 0.3) )
+      layout(matrix(c(1:8, 9, 9), nrow=5, byrow=TRUE), heights=c(rep(1,4), 0.3) )
     }
+    
+    
     
     
     #par(mfrow=c(3, 3))
@@ -150,7 +150,7 @@ for (m in 1:length(metrics)) {
     #####################
     ### Read datasets ###
     #####################
-
+    
     #Loop through datasets    
     for (d in 1:length(datasets)) {
       
@@ -166,7 +166,7 @@ for (m in 1:length(metrics)) {
       
       plot_data_hist <- brick()
       plot_data_fut <- lapply(envelopes, function(x) brick())
-
+      
       
       #Find models (use historical to find them, only want to include models that have historical data)
       #should be all of them but just in case
@@ -187,10 +187,10 @@ for (m in 1:length(metrics)) {
       dir.create(dataset_dir, recursive=TRUE)
       
       hist_out_file <- paste0(dataset_dir, "/historical_data_", datasets[d], "_",
-                          vars[v], "_", metrics[m], ".nc")
+                              vars[v], "_", metrics[m], ".nc")
       
       fut_out_files <- lapply(envelopes,  function(x) paste0(dataset_dir, "/", x, "deg_data_", datasets[d], "_",
-                                             vars[v], "_", metrics[m], ".nc"))
+                                                             vars[v], "_", metrics[m], ".nc"))
       
       #model name files
       mod_name_hist_file <-paste0(dataset_dir, "/historical_mod_names_", datasets[d], "_",
@@ -233,9 +233,10 @@ for (m in 1:length(metrics)) {
             }
             
             
-            #Initialise
+            # #Initialise
+            # all_hist <- brick()
             all_fut <- lapply(envelopes, function(x) brick())
-            
+            # 
             #Loop through ensembles
             for (gc in 1:length(gcms)) {
               
@@ -254,7 +255,7 @@ for (m in 1:length(metrics)) {
               if (length(hist_file) != 1) stop("wrong CABLE/AWRA historical file")
               
               #Read data
-              hist_data <- raster(hist_file)
+              hist_data <- raster(hist_file) #addLayer(all_hist, raster(hist_file))
               
               
               ### Future data ##
@@ -266,32 +267,31 @@ for (m in 1:length(metrics)) {
                 
                 #Folders in a different order, deal with this
                 if (datasets[d] == "CABLE") {
-                   files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", gcms[gc], "/", 
-                                                  models[mod]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
+                  files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", gcms[gc], "/", 
+                                                 models[mod]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
                   
-                 } else {
-                   files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
-                                                  gcms[gc]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
+                } else {
+                  files_deg <- list.files(paste0(mod_path, "/", envelopes[gw], "deg/", models[mod], "/", 
+                                                 gcms[gc]),  recursive=TRUE, pattern=".nc", full.names=TRUE)
                 }
                 
                 
                 
-                 
+                
                 #Check that found files, some GW levels don't have any
                 if (length(files_deg) > 0) {
                   
                   #Read future data and calculate difference to historical
-                  data_deg <- brick(lapply(files_deg, raster)) - hist_data
+                  data_deg <- brick(lapply(files_deg, raster)) - hist_data 
                   
-                  #calculate median
                   all_fut[[gw]] <- calc(data_deg, median)
                   
                   #save model names
                   model_names_fut[[gw]]  <- append(model_names_fut[[gw]], paste0(models[mod], "/", gcms[gc]))
-                  
                 }
                 
               }
+              
               
               
               #save model names
@@ -306,6 +306,8 @@ for (m in 1:length(metrics)) {
                          all_fut[[x]])
                 else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
               
+              
+              
             } #GCMs            
             
             
@@ -313,25 +315,10 @@ for (m in 1:length(metrics)) {
             # ens_median_hist <- calc(all_hist, median)
             # ens_median_fut  <- lapply(all_fut, function(x) if(!all(is.na(values(x)))) calc(x, median))
             # 
-            # 
-            # #Collate
-            # plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
-            # 
-            # plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
-            #   addLayer(plot_data_fut[[x]],
-            #            ens_median_fut[[x]])
-            #   else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
-            # 
-            # 
-            # #save model names
-            # model_names_hist <- append(model_names_hist, paste0(models[mod], "/", gcms[gc]))
-            # for (ii in 1:length(envelopes)) {
-            #   if(!is.null(ens_median_fut[[ii]])) {
-            #     model_names_fut[[ii]]  <- append(model_names_fut[[ii]], paste0(models[mod], "/", gcms[gc]))
-            #   }
-            # }
-            #   
-
+           
+            
+          
+            
             
             
             ##################
@@ -355,11 +342,7 @@ for (m in 1:length(metrics)) {
                                              ensembles[ens]), pattern=".nc", full.names=TRUE)
               
               #Should only find one file, check
-              if (length(hist_file) < 1) stop("wrong CMIP6 historical file")
-              
-              #Bug in processing code, accidentally wrote multiple historical files
-              #take the first one if found multiple
-              if (length(hist_file) > 1) hist_file <- hist_file[1]
+              if (length(hist_file) != 1) stop("wrong CMIP6 historical file")
               
               #Read data
               all_hist <- addLayer(all_hist, raster(hist_file))
@@ -379,7 +362,7 @@ for (m in 1:length(metrics)) {
                   #Read future data and calculate difference to historical
                   data_deg <- brick(lapply(files_deg, raster)) - all_hist[[ens]]
                   
-                  all_fut[[gw]] <- addLayer(all_fut[[gw]], calc(data_deg, median))
+                  all_fut[[gw]] <- calc(data_deg, median)
                   
                 }
                 
@@ -397,10 +380,10 @@ for (m in 1:length(metrics)) {
             plot_data_hist <- addLayer(plot_data_hist, ens_median_hist)
             
             plot_data_fut <- lapply(envelopes, function(x) if(!is.null(ens_median_fut[[x]]))
-                                    addLayer(plot_data_fut[[x]],
-                                             ens_median_fut[[x]])
-                                    else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
-                                  
+              addLayer(plot_data_fut[[x]],
+                       ens_median_fut[[x]])
+              else plot_data_fut[[x]]) #this else just returns the same data, i.e. does nothing. Otherwise retursn a NULL and messes things up 
+            
             #save model names
             model_names_hist <- append(model_names_hist, models[mod])
             
@@ -432,20 +415,20 @@ for (m in 1:length(metrics)) {
         lapply(1:length(model_names_fut), function(x) write.csv(model_names_fut[[x]], mod_name_fut_file[[x]]))
         
         
-      #If files already processed, read them in
+        #If files already processed, read them in
       } else {
         
         #Read data in
         plot_data_hist <- brick(hist_out_file)
         plot_data_fut  <- lapply(fut_out_files, brick)
- 
+        
         #Also get model names (need to grab second column as first one is just indices)
         model_names_hist <- read.csv(mod_name_hist_file)[,2]
         model_names_fut  <- lapply(mod_name_fut_file, function(x) read.csv(x)[,2])
-
+        
       }
       
-       
+      
       
       
       ################
@@ -460,52 +443,19 @@ for (m in 1:length(metrics)) {
       #Then find common models
       common_models <- Reduce(intersect, all_names) #needs capital R, found on stack overflow
       
-      
-      
-      ### Historical median ###
-      
-      
-      #Only show pixels where at least 80% of models have data available
-      #For runoff, some pixels are NA most likely because of zero runoff values.
-      #Shouldn't be a problem for other variables
-      mask_data_hist <- calc(plot_data_hist[[which(model_names_hist %in% common_models)]], mask_data)
-      
-      #Only take common models
-      hist_median <- calc(mask_data_hist, median, na.rm=TRUE)
-      
-      #Plot
-      len <- length(lims_hist[[vars[v]]][[metrics[m]]])
-      image(mask(hist_median, Aus), breaks=lims_hist[[vars[v]]][[metrics[m]]], 
-            col=c(cols_hist(len-1)),
-            axes=FALSE, ann=FALSE, asp=1)
-      
-      #Australia outline
-      map(region="Australia", add=TRUE, lwd=0.7) #border="grey50"
-      
-      
-      #time period label
-      if (d == 1) mtext(side=3, "Historical mean")
-        
-      #dataset label
-      mtext(side=2, paste0(datasets[d], " (", length(common_models), ")"))
-      
-      
-      
+
       
       ### Future difference ###
       
       for (env in 1:length(envelopes)) {
-        
-        #Again mask where more than 20% of pixels are missing
-        mask_data_fut <- calc(plot_data_fut[[env]][[which(model_names_fut[[env]] %in% common_models)]], mask_data)
-        
+
         #calculate median
-        fut_median <- calc(mask_data_fut, fun=median, na.rm=TRUE)
+        fut_agreement <- calc(plot_data_fut[[env]][[which(model_names_fut[[env]] %in% common_models)]], model_agreement)
         
         
         #Plot
         len <- length(lims_diff[[metrics[m]]])
-        image(mask(fut_median, Aus), breaks=lims_diff[[metrics[m]]], 
+        image(mask(fut_agreement, Aus), breaks=lims_diff[[metrics[m]]], 
               col=c(cols_diff(len-1)),
               axes=FALSE, ann=FALSE, asp=1)
         
@@ -516,22 +466,14 @@ for (m in 1:length(metrics)) {
         #time period label
         if (d == 1) mtext(side=3, paste0(env, " degree"))
         
+        
+        #dataset label
+        if(env==1) mtext(side=2, paste0(datasets[d], " (", length(common_models), ")"))
+        
+        
       }
     } #datasets
     
-   
-    #Historical legend
-    
-    #Empty plot
-    plot(1, type="n", bty="n", yaxt="n", xaxt="n")
-
-    #Legend
-    len1 <- length(lims_hist[[vars[v]]][[metrics[m]]])-1
-    add_raster_legend2(cols=cols_hist(len1), limits=lims_hist[[vars[v]]][[metrics[m]]][2:len1],
-                       main_title=unit[metrics[m]], plot_loc=c(0.3,0.7,0.63, 0.77),
-                       title.cex=1, spt.cex=1, clip=TRUE, ysp_title_old=FALSE)
-
-
 
     
     #Future legend
@@ -547,8 +489,8 @@ for (m in 1:length(metrics)) {
     
     
     
- 
-  
+    
+    
     dev.off ()
     
   } #metrics

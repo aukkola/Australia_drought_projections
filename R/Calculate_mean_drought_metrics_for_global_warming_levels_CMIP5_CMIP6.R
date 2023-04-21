@@ -137,8 +137,7 @@ for (d in 1:length(dataset)) {
             dir.create(outdir_hist, recursive=TRUE)
             
             hist_outfile <- paste0(outdir_hist, "/Historical_mean_", variables[v], "_",
-                                   names(metrics)[m], "_", gcms[g], "_", ensembles[ens], "_",
-                                   experiments[exp], ".nc")
+                                   names(metrics)[m], "_", gcms[g], "_", ensembles[ens], ".nc")
             
             print(paste0("processing: ", hist_outfile))
             
