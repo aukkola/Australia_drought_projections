@@ -64,13 +64,10 @@ DIR="/g/data/w97/amu561/CABLE_AWRA_comparison/CORDEX_data"
 dataset="cordex"
 
 #Clef search with options for models, experiments, variables etc.
-# search_criteria="--local $dataset --domain AUS-44i --experiment historical \
-#                  --experiment rcp45 --experiment rcp85 \
-#                  --experiment rcp26 --variable pr --time_frequency mon"
-
+#--local
 search_criteria="$dataset --domain AUS-44i --experiment historical \
-                --experiment rcp45 --experiment rcp85 \
-                --experiment rcp26 --variable pr --time_frequency mon"
+                 --experiment rcp45 --experiment rcp85 \
+                 --experiment rcp26 --variable mrro --time_frequency mon"
 
 
 #Mask oceans? Set to true (masking) or false (no masking). If set to true and no
@@ -120,15 +117,20 @@ dir_name="historical_spp2-4.5"
 #Search database to find all available data
 
 #File where to save search results
-in_file=$TEMP_DIR/"${dataset}_clef_search_results_pr.csv"
+in_file=$TEMP_DIR/"${dataset}_clef_search_results_mrro.csv"
 
-# 
-# #Remove this file if it exists, otherwise new results will be appended to it
-# if [[ -f "$in_file" ]]; then rm $in_file; fi
-# 
-# 
+#Remove this file if it exists, otherwise new results will be appended to it
+if [[ -f "$in_file" ]]; then rm $in_file; fi
+ 
+#Clef has a bug and doesn't find all CORDEX data. Find data manually
+#using the file path (should identify all data as it's all in the same location)
+#as per NCI advice
+
 # #Perform Clef search
-# clef $search_criteria >> $in_file
+#clef $search_criteria >> $in_file
+data_path="/g/data/rr3/publications/CORDEX/output/AUS-44i/*/*/*/r1i1p1/*/v1/mon/mrros/latest"
+
+ls -d $data_path | grep -Ewv 'evaluation' >> $in_file
 
 
 #Filter search results to find common models and ensemble members
@@ -160,7 +162,7 @@ do
 
 
     #Find variables (var_table/var combination)
-    vars="${IN_DIR}/${E}/mon/pr" #`find ${IN_DIR}/${E} -maxdepth 2 -mindepth 2 ! -path . -type d`
+    vars="${IN_DIR}/${E}/mon/mrro" #`find ${IN_DIR}/${E} -maxdepth 2 -mindepth 2 ! -path . -type d`
 
 
     ### Loop through variables ###

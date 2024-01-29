@@ -16,22 +16,6 @@ import datetime
 import xarray as xr
 
 
-#fix to /g/data/w97/amu561/CMIP6_runoff_drought/CMIP6_data/Processed_CMIP6_data/ssp126/mrro/NorESM2-LM/r1i1p1f1
-# file=mrro_NorESM2-LM_ssp126_r1i1p1f1_mm_month_2015_2100_ssp126_regrid_setgrid.n
-# #Missing first January
-# file=`ls *setgrid.nc`
-# cp $file original_data_missing_tstep.nc
-# cdo seltimestep,1 $file first_month.nc
-# cdo shifttime,-1mon first_month.nc shifted.nc
-# cdo mergetime shifted.nc $file fixed.nc
-# mv fixed.nc $file
-# rm shifted.nc first_month.nc
-
-#All NorESM-LM and NorEMS-MM lai and mrro files were fixed
-#Also /g/data/w35/amu561/CMIP6_runoff_drought//CMIP6_data/Processed_CMIP6_data/ssp585/mrro/TaiESM1/r1i1p1f1/
-#mrro_TaiESM1_ssp585_r1i1p1f1_mm_month_2015_2100_ssp585_regrid_setgrid.nc
-#and equivalent LAI file
-
 ### Set paths ###
 
 root_path = "/g/data/w97/amu561/CABLE_AWRA_comparison/"
@@ -117,10 +101,29 @@ for s in range(len(scale)):
     #Reference data for calculating threshold
     for m in range(len(models)):
 
+
+        #Check that all experiments exist. Some models only have a subset
+        #available, skip these
+        if len(os.listdir(in_path +  "/" + models[m] )) != len(experiment):
+            continue
+
+        #These models are not yet available even though folder exists, skip
+        #if models[m] == "CMCC-CMCC-ESM2" or models[m] == "NCAR-CESM2":
+        #    continue
+
         #Loop through experiments
         for k in range(len(experiment)):
 
-            ensemble = os.listdir(in_path +  "/" + models[m] + "/" + experiment[k])
+            exp_path = str(in_path +  "/" + models[m] + "/" + experiment[k])
+
+            #One or two folders don't exist (e.g. CMCC-CMCC-ESM2/ssp126),
+            #skip if this is the case
+            if os.path.exists(exp_path):
+                ensemble = os.listdir(exp_path)
+            else:
+                print("SKIPPING " + models[m] + "/" + experiment[k] + ", does not exist")
+                continue
+
 
             #Loop through ensemble members (only one per model?)
             for e in range(len(ensemble)):
@@ -152,10 +155,10 @@ for s in range(len(scale)):
                     ### Find BARPA files ###
                     
                     #List files
+                    
                     files = glob.glob(in_path +  "/" + models[m] + "/" + experiment[k] + "/" +
                                ensemble[e] + "/BOM-BARPA-R/v1/mon/" + var_name[v] + "/*.nc")
-                    
-                      
+                                          
                     #If using obs as reference
                     if obs_ref:
                         obs_files = glob.glob(in_path +  "/" + models[m] + "/historical/" +

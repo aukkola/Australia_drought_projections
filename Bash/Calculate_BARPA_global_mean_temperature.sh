@@ -49,15 +49,19 @@ do
         continue
       fi
       
+      #len=`ls ${met_path}/${mod}/ | wc -l`
+      #if [ $len -ne 3 ]; then
+      #    continue
+      #fi
       
+          
       #List ensemble members
       ensembles=`ls ${met_path}/${mod}/${exp}/`
 
       #Loop through ensemble members
       for ens in $ensembles
       do
-      
-        
+            
         #Outfile
         outdir_mod=$outdir"/"$exp"/"$mod"/"${ens}
         mkdir -p $outdir_mod

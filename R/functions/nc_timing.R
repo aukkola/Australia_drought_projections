@@ -14,9 +14,10 @@ read_nc_time <- function(file) {
   dodays <- TRUE
   dohours <- FALSE
   doseconds <- FALSE
+  dominutes <- FALSE
   
   nc <- nc_open(file)
-  
+  nc_time <- ncvar_get(nc, "time")
   un <- ncatt_get(nc, "time")$unit	
   if (substr(un, 1, 10) == "days since") { 
     startDate = as.Date(substr(un, 12, 22))
@@ -35,6 +36,11 @@ read_nc_time <- function(file) {
     dodays <- FALSE
     startTime = as.Date(substr(un, 14, 31))
     mult <- 1
+  } else if (substr(un, 1, 13) == "minutes since") { 
+    dominutes <- TRUE
+    dodays <- FALSE
+    startTime <- substr(un, 15, 31)
+    mult <- 60
   } else {
     return(x)
   }
@@ -43,12 +49,12 @@ read_nc_time <- function(file) {
     if (is.na(start)) start <- strptime(startTime, "%Y-%m-%d", tz = "UTC")
     if (is.na(start)) return(x)
     startTime <- start
-    time <- startTime + as.numeric(getZ(x)) * mult
-    time <- as.character(time)
-    if (!is.na(time[1])) {
-      x@z <- list(time)
-      names(x@z) <- as.character('Date/time')
-    }	
+    time <- startTime + as.numeric(nc_time) * mult
+    #time <- as.character(time)
+    # if (!is.na(time[1])) {
+    #   x@z <- list(time)
+    #   names(x@z) <- as.character('Date/time')
+    # }	
   } else if (dodays) {
     # cal = nc$var[[zvar]]$dim[[dim3]]$calendar ?
     cal <- ncdf4::ncatt_get(nc, "time", "calendar")
