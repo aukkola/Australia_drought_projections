@@ -47,7 +47,7 @@ datasets <- c("CMIP6", "BARPA", "CORDEX", "AWRA" )
 
 
 #List metrics
-metrics <- c("time_in_drought", "duration", "rel_intensity")#, "frequency")
+metrics <- c("time_in_drought")#, "duration", "rel_intensity")#, "frequency")
 
 
 outdir <- paste0(path, "/Figures/")

@@ -128,7 +128,7 @@ if [[ -f "$in_file" ]]; then rm $in_file; fi
 
 # #Perform Clef search
 #clef $search_criteria >> $in_file
-data_path="/g/data/rr3/publications/CORDEX/output/AUS-44i/*/*/*/r1i1p1/*/v1/mon/mrros/latest"
+data_path="/g/data/rr3/publications/CORDEX/output/AUS-44i/*/*/*/r1i1p1/*/v1/mon/mrro/latest"
 
 ls -d $data_path | grep -Ewv 'evaluation' >> $in_file
 

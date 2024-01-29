@@ -119,13 +119,18 @@ dir_name="historical_spp2-4.5"
 #File where to save search results
 in_file=$TEMP_DIR/"${dataset}_clef_search_results_tas.csv"
 
+#Remove this file if it exists, otherwise new results will be appended to it
+if [[ -f "$in_file" ]]; then rm $in_file; fi
 
-# #Remove this file if it exists, otherwise new results will be appended to it
-# if [[ -f "$in_file" ]]; then rm $in_file; fi
-# 
-# 
+#Clef has a bug and doesn't find all CORDEX data. Find data manually
+#using the file path (should identify all data as it's all in the same location)
+#as per NCI advice
+
 # #Perform Clef search
-# clef $search_criteria >> $in_file
+#clef $search_criteria >> $in_file
+data_path="/g/data/rr3/publications/CORDEX/output/AUS-44i/*/*/*/r1i1p1/*/v1/mon/tas/latest"
+
+ls -d $data_path | grep -Ewv 'evaluation' >> $in_file
 
 
 #Filter search results to find common models and ensemble members
