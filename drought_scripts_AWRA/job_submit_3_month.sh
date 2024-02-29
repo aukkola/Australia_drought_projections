@@ -22,7 +22,7 @@ for bcm in QME MRNBC CCAM ISIMIP2b; do
         #for scenario in rcp85; do
         for scenario in rcp45 rcp85; do
             #for variable in qtot s0; do
-            for variable in qtot s0 pr; do
+            for variable in qtot sm_total sm_root pr; do
                               
 		            outdir="/g/data/w97/amu561/CABLE_AWRA_comparison/Drought_metrics/AWRA/3-month/${bcm}/${model}/"  
                 mkdir -p $outdir

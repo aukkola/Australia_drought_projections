@@ -80,7 +80,7 @@ baseline=[1970,2005]
 
 ### Define file locations ###
 input_variable=['pr']
-output_variable=['qtot','s0']
+output_variable=['qtot','sm_total','sm_root']
 
 
 # Any output data from CCAM has a slightly differenet path
@@ -98,34 +98,6 @@ if variable in input_variable: # and bias_corr in compliant:
 if variable in output_variable: # and bias_corr in compliant:
     data_path_var= data_path + "/HMOUTPUT/output/AUS-5/BoM"
 
-### Get historical and future simulations ###
-
-#historical
-if bias_corr=="CCAM":
-    files_hist=str(data_path_var + '/' + awra_add + model + '/historical/r1i1p1/' +
-                       ccam_add + 'r240x120-ISIMIP2b-AWAP/latest/day/' +
-                       variable + '/*1960*.nc')
-else:
-    files_hist=str(data_path_var + '/' + awra_add + model +'/historical/r1i1p1/' +
-                       ccam_add + 'r240x120-' + bias_corr + '-AWAP/latest/day/' +
-                       variable + '/*1960*.nc')
-
-#Files to merge                    
-files_all=glob.glob(files_hist)
-
-#Future
-if bias_corr=="CCAM":
-    files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
-                    '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
-                    'latest/day/' + variable + '/*2006*.nc')
-else:
-    files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
-                       '/r1i1p1/' + ccam_add + 'r240x120-' + bias_corr + 
-                       '-AWAP/latest/day/' + variable + '/*2006*.nc')
-
-files_to_merge_fut=glob.glob(files_fut)
-
-files_all.extend(files_to_merge_fut)
 
 
 ### Create temporary directory ###
@@ -135,88 +107,18 @@ os.system("mkdir -p " + temp_dir_path)
 os.system("mkdir -p " + scratch_path + "/monthly_sums/")
 
 
-### Location of output file ###
-merged_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + 
-                  model + "_" + scenario + "_" + variable + ".nc")
-
-
-#Some duplicate time steps, need to skip these when merging
-#os.system("export SKIP_SAME_TIME=1")
-
-
-#If output file doesn't alreade exist, create it. Else skip 
-if not os.path.isfile(merged_file):
-
-    
-    temp_file=str(temp_dir_path + "/temp_" + variable + "_file.nc")
-    
-    files_merge=" ".join(files_all)
-    ### Merge the monthly sum data ###
-    os.system("cdo mergetime " + files_merge + " " + temp_file)
-    
-    #Calculate monthly mean/sum
-    #Average for soil moisture, otherwise sum
-    if variable == "s0" :
-        os.system("cdo monmean " + temp_file + " " + merged_file)
-    else:
-        os.system("cdo monsum " + temp_file + " " + merged_file)
-    
-    #Remove temp file
-    os.system("rm " + temp_file)
-
-
-    # ds = xr.open_mfdataset(files_all)
-    # 
-    # #test=ds['s0'].groupby("time.month").sum()
-    # test1=ds['s0'].resample(time="1MS").mean(dim="time")
-    # 
-    # #Rename data variable
-    # test1.name = variable
-    # 
-    # #Write to file
-    # test1.to_netcdf(merged_file, format='NETCDF4', 
-    #                encoding={variable:{
-    #                          'shuffle':True,
-    #                          'chunksizes':[12, 681, 40],
-    #                          'zlib':True,
-    #                          'complevel':5}
-    #                          })
-
-
-
-
-    # #Soil moisture
-    # if variable == "sm" :
-    # 
-    #     monthly_s0 = 
-    # 
-    # 
-    #     #Need to sum s0, ss and sd to get total soil moisture 
-    #     extra_vars = ["ss", "sd"]
-    # 
-    #     if bias_corr=="CCAM":
-    #         add="ISIMIP2b"
-    #     else:
-    #         add = bias_corr
-    # 
-    #     for s in range(len(extra_vars)):
-    # 
-    #         #file name (leave unfinished to complete below as also need to use it flexibly
-    #         #when reading data back in)
-    #         sm_out_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
-    #                           scenario + "_")
-            
-
-
-
-
-
 ### Get total soil moisture ###
 
-#Need to also get ss (shallow soil, 10-100cm) and sd (deep soil (100-600cm))
-if variable=="s0":
+#Need to get s0 (surface, 0-10cm), ss (shallow soil, 10-100cm) and sd (deep soil (100-600cm))
+if variable in ["sm_total", "sm_root"]:
 
-    extra_vars = ["ss", "sd"]
+    #Variables to fetch
+    extra_vars = ["s0", "ss"]
+    
+    #Add deep soil if calculating total soil moisture
+    if variable=="sm_total":
+        extra_vars.append("sd")
+    
     
     if bias_corr=="CCAM":
         add="ISIMIP2b"
@@ -225,10 +127,10 @@ if variable=="s0":
 
     for s in range(len(extra_vars)):
         
-        #file name (leave unfinished to complete below as also need to use it flexibly
-        #when reading data back in)
+        print("extra var: ", extra_vars[s])
+        #output file name
         sm_out_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
-                          scenario + "_")
+                          scenario + "_" )
         
 
         #If output doesn't already exist, create it
@@ -245,7 +147,7 @@ if variable=="s0":
 
             sm_files.extend(sm_files_fut)
         
-        
+            print("SM files: ", *sm_files)
         
             temp_sm_file=str(temp_dir_path + "/temp_" + extra_vars[s] + "_file.nc")
             
@@ -255,10 +157,119 @@ if variable=="s0":
             os.system("cdo mergetime " + files_sm_merge + " " + temp_sm_file)
             
             #Take monthly mean
-            os.system("cdo monmean " + temp_sm_file + " " + str(sm_out_file + extra_vars[s] + ".nc"))
+            os.system("cdo monmean " + temp_sm_file + " " + sm_out_file + extra_vars[s] + ".nc")
 
             #Remove temp file
-            os.system("rm " + temp_sm_file)
+            #os.system("rm " + temp_sm_file)
+
+
+
+#Precip, runoff
+else:
+    
+    ### Get historical and future simulations ###
+
+    #historical
+    if bias_corr=="CCAM":
+        files_hist=str(data_path_var + '/' + awra_add + model + '/historical/r1i1p1/' +
+                           ccam_add + 'r240x120-ISIMIP2b-AWAP/latest/day/' +
+                           variable + '/*1960*.nc')
+    else:
+        files_hist=str(data_path_var + '/' + awra_add + model +'/historical/r1i1p1/' +
+                           ccam_add + 'r240x120-' + bias_corr + '-AWAP/latest/day/' +
+                           variable + '/*1960*.nc')
+
+    #Files to merge                    
+    files_all=glob.glob(files_hist)
+
+    #Future
+    if bias_corr=="CCAM":
+        files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
+                        '/r1i1p1/' + ccam_add + 'r240x120-ISIMIP2b-AWAP/' + 
+                        'latest/day/' + variable + '/*2006*.nc')
+    else:
+        files_fut=str(data_path_var + '/' + awra_add + model + '/' + scenario + 
+                           '/r1i1p1/' + ccam_add + 'r240x120-' + bias_corr + 
+                           '-AWAP/latest/day/' + variable + '/*2006*.nc')
+
+    files_to_merge_fut=glob.glob(files_fut)
+
+    files_all.extend(files_to_merge_fut)
+
+    ### Location of output file ###
+    merged_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + 
+                      model + "_" + scenario + "_" + variable + ".nc")
+
+
+    #Some duplicate time steps, need to skip these when merging
+    #os.system("export SKIP_SAME_TIME=1")
+
+
+    #If output file doesn't alreade exist, create it. Else skip 
+    if not os.path.isfile(merged_file):
+
+        
+        temp_file=str(temp_dir_path + "/temp_" + variable + "_file.nc")
+        
+        files_merge=" ".join(files_all)
+        ### Merge the monthly sum data ###
+        os.system("cdo mergetime " + files_merge + " " + temp_file)
+        
+        #Calculate monthly mean/sum
+        #Average for soil moisture, otherwise sum
+        #if variable in ["sm_total", "sm_root"] :
+        #    os.system("cdo monmean " + temp_file + " " + merged_file)
+        #else:
+        os.system("cdo monsum " + temp_file + " " + merged_file)
+        
+        #Remove temp file
+        os.system("rm " + temp_file)
+
+
+        # ds = xr.open_mfdataset(files_all)
+        # 
+        # #test=ds['s0'].groupby("time.month").sum()
+        # test1=ds['s0'].resample(time="1MS").mean(dim="time")
+        # 
+        # #Rename data variable
+        # test1.name = variable
+        # 
+        # #Write to file
+        # test1.to_netcdf(merged_file, format='NETCDF4', 
+        #                encoding={variable:{
+        #                          'shuffle':True,
+        #                          'chunksizes':[12, 681, 40],
+        #                          'zlib':True,
+        #                          'complevel':5}
+        #                          })
+
+
+
+
+        # #Soil moisture
+        # if variable == "sm" :
+        # 
+        #     monthly_s0 = 
+        # 
+        # 
+        #     #Need to sum s0, ss and sd to get total soil moisture 
+        #     extra_vars = ["ss", "sd"]
+        # 
+        #     if bias_corr=="CCAM":
+        #         add="ISIMIP2b"
+        #     else:
+        #         add = bias_corr
+        # 
+        #     for s in range(len(extra_vars)):
+        # 
+        #         #file name (leave unfinished to complete below as also need to use it flexibly
+        #         #when reading data back in)
+        #         sm_out_file = str(scratch_path + "/monthly_sums/" + bias_corr + "_" + model + "_" + 
+        #                           scenario + "_")
+                
+
+
+
 
 
 ### Delete temporary directory ###
@@ -269,22 +280,26 @@ if variable=="s0":
 #################
 
 #Model data
-if variable == "s0":
+if variable in ["sm_total", "sm_root"]:
 
     #s0 data (surface)
-    fh        = Dataset(merged_file, mode='r')
+    fh        = Dataset(str(sm_out_file + "s0.nc"), mode='r')
     s0_data   = fh.variables["s0"][:]
 
     #ss data (shallow)
     ds_ss     = Dataset(str(sm_out_file + "ss.nc"), mode='r')
     ss_data   = ds_ss.variables["ss"][:]
-
-    #sd data (deep)
-    ds_sd     = Dataset(str(sm_out_file + "sd.nc"), mode='r')
-    sd_data   = ds_sd.variables["sd"][:]
     
-    #Sum s0, ss and sd to get total soil moisture
-    all_data  = s0_data.data + ss_data.data + sd_data.data
+    #Sum s0 and ss to get root zone soil moisture
+    all_data  = s0_data.data + ss_data.data 
+    
+    #Add deep layer if using total soil moisture
+    if variable == "sm_total":
+        #sd data (deep)
+        ds_sd     = Dataset(str(sm_out_file + "sd.nc"), mode='r')
+        sd_data   = ds_sd.variables["sd"][:]
+
+        all_data = all_data + sd_data.data
     
     
     data      = all_data
@@ -332,12 +347,12 @@ if not os.path.exists(out_path):
 # ##########################################
 # ##########################################       
 #Create output file name
-if variable=='s0':
-    var_name='sm'
-else:
-    var_name=variable
+#if variable=='s0':
+#    var_name='sm'
+#else:
+#    var_name=variable
 out_file = str(out_path + "/drought_metrics_" + bias_corr + "_" + model + "_" + 
-               var_name + "_" + scenario + "_" + str(scale) + ".nc")
+               variable + "_" + scenario + "_" + str(scale) + ".nc")
                
 ##########################################
 ##########################################
@@ -509,4 +524,32 @@ else:
 
 # Close the file
 ncfile.close()
+
+
+#Compress file
+os.system("nccompress " + out_file)
+os.system("mv " + out_path + "/tmp.nc_compress/*" + variable + "*.nc " + out_path)
+#os.system("rm -r " + out_path + "/tmp.nc_compress")
+# jobs=`qselect -u amu561`
+# for J in $jobs
+# do
+# echo $J
+# if [[ "$J" =~ "109307765.gadi-pbs" ]]; then
+# echo "skip"
+# else
+# qdel $J
+# fi
+# done
+
+
+
+
+
+
+
+
+
+
+
+
 
